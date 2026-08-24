@@ -1,7 +1,7 @@
 /**
  * `koineformat` — the library surface.
  *
- * This entry exports the Pin *envelope* and nothing else: the manifest, the
+ * This entry exports the package *envelope* and nothing else: the manifest, the
  * integrity digests, seal, verify, and the lockfile shape. It is the same code
  * the `koine` CLI runs — the envelope exists exactly once, here — with the CLI's
  * filesystem, network, and terminal layers left behind.
@@ -16,17 +16,17 @@
  * Working in bytes, not paths: you hand in `Map<relativePath, Uint8Array>`, the
  * same shape the CLI builds by walking a directory.
  *
- *   import { sealManifest, inspectFiles, serializeManifest } from "koineformat"
+ *   import { sealPackage, inspectFiles, serializeManifest } from "koineformat/lib"
  *
- *   const files = new Map([["notes.md", new TextEncoder().encode("…")], ["pin.json", …]])
- *   const { manifest } = await sealManifest(files)
+ *   const files = new Map([["notes.md", new TextEncoder().encode("…")], ["koine.json", …]])
+ *   const { manifest } = await sealPackage(files)
  *   const bytes = serializeManifest(manifest)
  *
  * The CLI (`koine add`/`install`/`update`) is deliberately absent: vendoring means
  * writing into a repo, which is a filesystem act.
  */
 
-// ── The envelope's types (SPEC §4.2, §5.2) ─────────────────────────────────
+// ── The envelope's types (SPEC §7.3, §7.7, §7.11) ──────────────────────────
 export type {
   ContentEntry,
   LockEntry,
@@ -37,7 +37,14 @@ export type {
   ResolvedPackage,
   ResolvedRef,
 } from "./core/types.js";
-export { KNOWLEDGE_DIR, LOCKFILE_PATH, SPEC_VERSION } from "./core/types.js";
+export type { ManifestDialect } from "./core/types.js";
+export {
+  KNOWLEDGE_DIR,
+  LOCKFILE_PATH,
+  LOCKFILE_PATH_V0,
+  SPEC_VERSION,
+  manifestDialect,
+} from "./core/types.js";
 
 // ── Errors: every failure names its cause and its fix (U6) ─────────────────
 export {
@@ -65,6 +72,7 @@ export {
 // ── Manifest: validate, parse, serialize, diff ─────────────────────────────
 export {
   MANIFEST_NAME,
+  MANIFEST_NAME_V0,
   NAME_RE,
   checkContents,
   computeContents,
