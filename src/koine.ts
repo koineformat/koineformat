@@ -35,7 +35,7 @@ Consumer:
   koine remove <name>               delete a package's directory and lock entry
 
 Publisher:
-  koine init [dir] [--name <n>] [--force]   scaffold a pin.json (--force overwrites)
+  koine init [dir] [--name <n>] [--force]   scaffold a koine.json (--force overwrites)
   koine seal [dir]                          recompute contents[] hashes + provenance
 
 Sources:
