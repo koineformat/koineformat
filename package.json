@@ -1,6 +1,6 @@
 {
   "name": "koineformat",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Definitions, types, decisions and their history as ordinary files beside your documents — so knowledge can leave home and still be understood, checked, and trusted.",
   "homepage": "https://koineformat.org",
   "type": "module",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./lib": {
+      "types": "./dist/lib.d.ts",
+      "import": "./dist/lib.js"
     }
   },
   "files": [
