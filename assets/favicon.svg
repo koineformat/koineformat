@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Koine favicon — the mark on a dark tile. Geometry authored at tile scale
+       (not transform-scaled), so the stroke weight survives at 16px.
+       Accent: terracotta #e58a4e (dark-tile pair of #ad461a), inherited from the
+       retired pinakes mark (consolidation word 2026-08-18; previously #96b96a). -->
+  <rect width="24" height="24" rx="5" fill="#15130d"/>
+  <path d="M8.0 6.9 L4.8 6.9 L4.8 17.1 L8.0 17.1" fill="none" stroke="#ede7d8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16.0 6.9 C19.5 8.9 19.5 15.1 16.0 17.1" fill="none" stroke="#ede7d8" stroke-width="2.3" stroke-linecap="round"/>
+  <rect x="10.3" y="8.9" width="3.4" height="6.2" rx="1.7" fill="#e58a4e"/>
+</svg>

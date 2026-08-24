@@ -1,0 +1,18 @@
+{
+  // Deploys the static standard page in ./site as a Workers Static Assets project.
+  // No Worker script (`main`) needed — this is an assets-only Worker.
+  // Deploy: `npx wrangler deploy`  ·  Docs: https://developers.cloudflare.com/workers/static-assets/
+  "name": "koineformat",
+  "compatibility_date": "2025-09-23",
+  "assets": {
+    "directory": "./site"
+  },
+  // The workers.dev route stays off — the one corner that would otherwise leak
+  // which account serves the standard's site (RUNBOOK step 4 discipline).
+  "workers_dev": false,
+  // The canonical home. Attaching the custom domain at deploy time creates the
+  // apex DNS record in the koineformat.org zone.
+  "routes": [
+    { "pattern": "koineformat.org", "custom_domain": true }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "koine/types/metric-definition@v0",
+  "title": "metric-definition",
+  "description": "The declared shape of a metric definition. A shape block in a definition file declares these fields; a proposal against a definition is checkable field-wise against this schema.",
+  "type": "object",
+  "properties": {
+    "kind": { "const": "metric-definition" },
+    "population": { "type": "string", "description": "Who is counted, including edge-case treatment (e.g. paused members)" },
+    "filter": { "type": "string", "description": "The qualifying condition and its window (e.g. 'qualifying-act within 90d')" },
+    "grain": { "type": "string", "description": "The unit of observation (e.g. member)" },
+    "unit": { "enum": ["count", "rate"], "description": "What the figure IS" },
+    "denominator": { "type": "string", "description": "Required when unit is 'rate' — a rate without a denominator convicts itself" },
+    "owner": { "type": "string", "pattern": "^actor:(user|agent):", "description": "The actor who owns this definition" },
+    "state": { "enum": ["spoken", "draft", "valid", "frozen"], "description": "Position on the validity gradient" }
+  },
+  "required": ["kind", "population", "filter", "grain", "unit", "owner", "state"],
+  "if": { "properties": { "unit": { "const": "rate" } } },
+  "then": { "required": ["denominator"] }
+}

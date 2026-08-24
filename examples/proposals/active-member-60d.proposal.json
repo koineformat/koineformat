@@ -1,0 +1,36 @@
+{
+  "format": "koine/proposal@v0",
+  "target": {
+    "nodeId": "n-d27727adce6c",
+    "path": "definitions/active-member.md",
+    "baseContentHash": "sha256:86af1c2518b7b88d8517fe831ae1beba644721dcb879750066cf66c7720da5d9"
+  },
+  "baseChainHead": "07b5f4210f3660dd9ae086ad9111114123408ce8f85a98ad21a386be45dbc66d",
+  "schema": "koine/types/metric-definition@v0",
+  "proposer": "actor:agent:claude",
+  "when": "2026-07-31T00:15:00Z",
+  "rationale": "The owner is considering narrowing the active-member filter window from 90 days to 60 days.",
+  "changes": [
+    {
+      "field": "filter",
+      "from": "qualifying-act within 90d",
+      "to": "qualifying-act within 60d"
+    }
+  ],
+  "resultingShape": {
+    "kind": "metric-definition",
+    "population": "workspace.members (paused included)",
+    "filter": "qualifying-act within 60d",
+    "grain": "member",
+    "unit": "count",
+    "owner": "actor:user:christiangruender",
+    "state": "valid"
+  },
+  "openQuestions": [
+    {
+      "field": "state",
+      "question": "Who applies this? Applied by the declared owner it stays valid; applied by anyone else it lands at draft pending the owner's re-promotion (SPEC 8, rule 2)."
+    }
+  ],
+  "notes": "Drafted by the first foreign consumer in the S1 bare-checkout test, then lifted to the declared envelope. Lives outside the target repo per Law 4."
+}

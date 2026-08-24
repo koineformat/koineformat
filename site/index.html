@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Koine Format — an open standard for knowledge that outlives its author</title>
+  <meta name="description" content="Definitions, types, decisions and their history as ordinary files beside your documents — so knowledge can leave home and still be understood, checked, and trusted." />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f7f5ef" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#16140f" media="(prefers-color-scheme: dark)" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://koineformat.org" />
+  <meta property="og:title" content="Koine Format — an open standard for knowledge that outlives its author" />
+  <meta property="og:description" content="What a team means by its own terms — declared beside the documents as ordinary files. Bodies travel verbatim; the sidecar carries meaning, identity and history." />
+  <meta name="twitter:card" content="summary" />
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="canonical" href="https://koineformat.org/" />
+
+  <style>
+    /* Koine Format — single static page. No external requests and no JavaScript
+       (fonts/CSS local), which is itself the thesis: knowledge, like this page,
+       stands on its own. */
+    :root {
+      --bg:      #f7f5ef;
+      --bg-card: #fffdf8;
+      --ink:     #1a1813;
+      --ink-mut: #5b564b;
+      --line:    #e4ddcd;
+      --accent:  #ad461a;
+      --accent-2:#9a3d14;
+      --term-bg: #15130d;
+      --term-fg: #ede7d8;
+      --term-mut:#8d8975;
+      --term-grn:#8fb573;
+      --maxw: 1060px;
+      --r: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:      #15130d;
+        --bg-card: #1d1a13;
+        --ink:     #efe9db;
+        --ink-mut: #a9a08b;
+        --line:    #2d2920;
+        --accent:  #e58a4e;
+        --accent-2:#eb9a63;
+        --term-bg: #0d0b07;
+        --term-fg: #ece6d7;
+        --term-mut:#857f6c;
+        --term-grn:#94ba78;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *{ transition:none !important; animation:none !important; } }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      font-size: 17px;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    .mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+    .wrap { max-width: var(--maxw); margin-inline: auto; padding-inline: clamp(20px, 5vw, 40px); }
+    section { padding-block: clamp(56px, 9vw, 104px); }
+    section + section { border-top: 1px solid var(--line); }
+
+    .skip { position:absolute; left:-9999px; top:0; background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:8px; z-index:10; }
+    .skip:focus { left:12px; top:12px; }
+
+    .eyebrow {
+      font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--accent-2); font-weight: 600; margin: 0 0 18px;
+    }
+
+    /* ---------- header / nav ---------- */
+    header.nav { border-bottom: 1px solid var(--line); position: sticky; top: 0; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); z-index: 9; }
+    .nav-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-block: 14px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:18px; color:var(--ink); letter-spacing:-.01em; }
+    .brand:hover { text-decoration:none; }
+    .brand svg { display:block; }
+    .brand .wm { letter-spacing:-.015em; }
+    .brand .wm b { color: var(--accent); font-weight: 800; }
+    .nav-links { display:flex; align-items:center; gap:8px; }
+    .nav-links a { color: var(--ink-mut); font-size:15px; padding:7px 11px; border-radius:8px; font-weight:500; }
+    .nav-links a:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); text-decoration:none; }
+
+    /* ---------- hero ---------- */
+    .hero { padding-top: clamp(48px, 8vw, 88px); }
+    /* The hero carries the formula verbatim, so it is sized for a sentence rather
+       than for a three-word headline: smaller type, wider measure, looser leading. */
+    .hero h1 {
+      font-size: clamp(30px, 4.7vw, 47px); line-height: 1.12; letter-spacing: -0.025em;
+      margin: 0; font-weight: 800; max-width: 24ch;
+    }
+    .hero h1 b { color: var(--accent); font-weight: 800; }
+    .hero .lede { font-size: clamp(19px, 2.4vw, 23px); color: var(--ink-mut); margin: 20px 0 0; max-width: 50ch; }
+    .hero .lede b { color: var(--ink); font-weight: 600; }
+
+    .coreline {
+      margin: 36px 0 0; padding: 22px 26px; border-left: 3px solid var(--accent);
+      background: var(--bg-card); border-radius: 0 var(--r) var(--r) 0;
+      font-size: clamp(17px, 2vw, 19px); line-height: 1.5; max-width: 64ch;
+    }
+    .coreline b { color: var(--accent-2); font-weight: 700; }
+
+    /* ---------- terminal ---------- */
+    .term {
+      background: var(--term-bg); border-radius: var(--r); overflow:hidden;
+      border:1px solid color-mix(in srgb, #000 22%, var(--term-bg));
+      box-shadow: 0 24px 50px -28px rgba(0,0,0,.5);
+    }
+    .term-bar { display:flex; align-items:center; gap:8px; padding:11px 15px; border-bottom:1px solid rgba(255,255,255,.07); }
+    .term-bar i { width:11px; height:11px; border-radius:50%; background:#3a362c; display:block; }
+    .term-bar i:nth-child(1){ background:#e06c5b; } .term-bar i:nth-child(2){ background:#e0b44e; } .term-bar i:nth-child(3){ background:#73c267; }
+    .term-bar span { margin-left:8px; color:var(--term-mut); font-size:12.5px; }
+    .term pre { margin:0; padding:20px 22px; overflow-x:auto; font-size:14.5px; line-height:1.85; color:var(--term-fg); min-width: 0; }
+    .term .cmd { color: var(--term-fg); }
+    .term .c { color: var(--term-mut); }
+    .term .ok { color: var(--term-grn); }
+    .term .ac { color: var(--accent-2); }
+    @media (prefers-color-scheme: dark){ .term .ac { color: var(--accent); } }
+
+    /* ---------- sections ---------- */
+    .lead-h { font-size: clamp(28px, 4vw, 40px); letter-spacing:-.025em; line-height:1.1; margin:0; font-weight:800; max-width: 24ch; }
+    .lead-p { color: var(--ink-mut); font-size: clamp(17px,2vw,19px); margin: 18px 0 0; max-width: 62ch; }
+    .lead-p b, .lead-p code { color: var(--ink); }
+    .lead-p code { background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 2px 6px; border-radius: 5px; font-size: .92em; }
+
+    .form-grid { display:grid; grid-template-columns: 1fr 1.05fr; gap:26px; margin-top: 44px; align-items:start; }
+    @media (max-width: 860px){ .form-grid { grid-template-columns: 1fr; } }
+    /* A grid item defaults to min-width:auto — a <pre> of unbreakable lines would
+       push the page wider than the viewport. min-width:0 lets the pre scroll itself. */
+    .form-grid > * { min-width: 0; }
+    .rule { margin: 0 0 22px; }
+    .rule h3 { margin: 0 0 8px; font-size: 17px; letter-spacing:-.01em; }
+    .rule h3 b { color: var(--accent-2); }
+    .rule p { margin: 0; color: var(--ink-mut); font-size: 16px; max-width: 52ch; }
+    .rule p b { color: var(--ink); }
+
+    .cards { display:grid; grid-template-columns: repeat(3, 1fr); gap:18px; margin-top: 44px; }
+    @media (max-width: 860px){ .cards { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg-card); border:1px solid var(--line); border-radius: var(--r); padding: 26px;
+    }
+    .card h3 { margin:0 0 12px; font-size:15px; letter-spacing:.04em; text-transform:uppercase; color: var(--accent-2); }
+    .card p { margin:0; font-size: 15.5px; line-height: 1.55; color: var(--ink); }
+    .card p b { color: var(--accent-2); }
+    .card p + p { margin-top: 10px; }
+    .card .mut { color: var(--ink-mut); }
+
+    /* ---------- chapters ---------- */
+    .chapters { margin-top: 64px; padding-top: 44px; border-top: 1px solid var(--line); }
+    .chapters h3 { margin: 0; font-size: clamp(21px, 2.6vw, 26px); letter-spacing: -.02em; font-weight: 800; }
+    .chapters .lead-p { margin-top: 12px; }
+    .spec-status { margin: 18px 0 0; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mut); font-weight: 600; }
+    .spec-status b { color: var(--accent-2); font-weight: 700; }
+    .ch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 40px; margin: 30px 0 0; padding: 0; list-style: none; }
+    @media (max-width: 860px){ .ch-grid { grid-template-columns: 1fr; } }
+    .ch { display: grid; grid-template-columns: 30px 1fr; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .ch .num { color: var(--accent-2); font-weight: 700; font-size: 14.5px; }
+    .ch .t { font-size: 15.5px; line-height: 1.5; }
+    .ch .t b { font-weight: 700; }
+    .ch .t span { color: var(--ink-mut); }
+
+    /* ---------- origin band ---------- */
+    .band { background: var(--bg-card); }
+    .band .lead-h { max-width: 26ch; }
+
+    /* ---------- footer ---------- */
+    footer { border-top:1px solid var(--line); padding-block: 40px; }
+    .foot-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px; }
+    .foot-row .left { color: var(--ink-mut); font-size:14.5px; max-width: 46ch; }
+    .foot-row .left b { color: var(--ink); font-weight:700; }
+    .foot-row .right { font-size:14.5px; }
+    .foot-origin { margin: 16px 0 0; color: var(--ink-mut); font-size: 13.5px; max-width: 64ch; line-height:1.55; }
+    .foot-origin b { color: var(--ink); }
+    .foot-origin .ipa { color: var(--ink); }
+    .foot-meta { margin-top: 22px; color: var(--ink-mut); font-size: 13px; display:flex; gap:14px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav-row">
+      <a class="brand" href="/" aria-label="Koine Format home">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <!-- Two notations of different shape hold one identical form between them. -->
+          <path d="M7.6 5.2 L3.5 5.2 L3.5 18.8 L7.6 18.8" fill="none" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M16.4 5.2 C21.1 7.9 21.1 16.1 16.4 18.8" fill="none" stroke="var(--ink)" stroke-width="2.6" stroke-linecap="round"/>
+          <rect x="9.9" y="7.9" width="4.2" height="8.2" rx="2.1" fill="var(--accent)"/>
+        </svg>
+        <span class="wm"><b>Koine</b> Format</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#form">The form</a>
+        <a href="#standard">The standard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- HERO -->
+    <section class="hero" aria-labelledby="h-hero">
+      <div class="wrap">
+        <h1 id="h-hero"><b>Koine</b> (the Koine Format) is an open standard for
+          knowledge that outlives its author.</h1>
+        <p class="lede">What a team means by its own terms — definitions, types, decisions
+          and their history — written <b>beside the documents as ordinary files</b>, so it can
+          leave home and still be understood, checked, and trusted.</p>
+
+        <p class="coreline">Knowledge never got its shared substrate — prose, tables and graphs
+          resist line-wise diffing, and that was taken as proof none is possible. It answers the
+          wrong question: anything can already <i>read</i> a body of knowledge. What nothing can
+          read is <b>what its author meant</b> — which types exist, which statement is of which
+          type, and who said so, since when. Koine declares exactly that.
+          <b>Declaration, not diffing, is the missing layer.</b></p>
+      </div>
+    </section>
+
+    <!-- THE FORM -->
+    <section id="form" aria-labelledby="h-form">
+      <div class="wrap">
+        <p class="eyebrow">The form</p>
+        <h2 class="lead-h" id="h-form">A sidecar beside your files. Never inside them.</h2>
+        <p class="lead-p">A koine tree is a directory of ordinary files plus one
+          <code>.koine/</code> directory beside them. Everything the standard adds lives in the
+          sidecar; the files themselves are untouched.</p>
+
+        <div class="form-grid">
+          <div>
+            <div class="rule">
+              <h3><b>Bodies travel verbatim.</b> Sidecar, never frontmatter.</h3>
+              <p>A koine tree never modifies the files it describes — their bodies travel
+                byte-for-byte as written. Every tool that reads them keeps working, and adding
+                meaning needs <b>nobody's permission</b>.</p>
+            </div>
+            <div class="rule">
+              <h3><b>The form is the constant.</b> The carrier is the variable.</h3>
+              <p>The sidecar carries identity, integrity and history itself rather than borrowing
+                them from a host — the same bytes are the same koine in a repository, a bare
+                folder, an archive, or a workspace. <b>No transport is prescribed.</b></p>
+            </div>
+            <div class="rule">
+              <h3><b>The shape of meaning</b> — never anyone's vocabulary.</h3>
+              <p>Koine specifies what a definition consists of and how identity, relations and
+                history travel. What “active member” means at your organisation
+                <b>stays yours to define</b>.</p>
+            </div>
+          </div>
+          <div>
+            <p class="eyebrow mono" style="margin-bottom:12px">~ a koine tree</p>
+            <div class="term" aria-label="A koine tree — file layout">
+              <div class="term-bar"><i></i><i></i><i></i><span class="mono">team-knowledge/</span></div>
+<pre class="mono">team-knowledge/
+├─ definitions/
+│  ├─ <span class="cmd">active-member.md</span>   <span class="c">← your files, untouched</span>
+│  └─ <span class="cmd">decision-record.md</span>
+├─ data/
+│  └─ <span class="cmd">decisions.jsonl</span>
+└─ <span class="ac">.koine/</span>               <span class="c">← the meaning, beside them</span>
+   ├─ <span class="ok">types/</span>             <span class="c">the dictionaries</span>
+   ├─ <span class="ok">nodes.jsonl</span>        <span class="c">one stable id per file</span>
+   ├─ <span class="ok">edges.jsonl</span>        <span class="c">the asserted graph</span>
+   └─ <span class="ok">history/</span>           <span class="c">who changed what, when</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- THE STANDARD, WHOLE -->
+    <section id="standard" aria-labelledby="h-standard">
+      <div class="wrap">
+        <p class="eyebrow">One standard</p>
+        <h2 class="lead-h" id="h-standard">Meaning, sealed, packaged — the same form at every boundary.</h2>
+        <p class="lead-p">One specification carries the whole journey of a body of knowledge:
+          what it means, who stands behind it, and how it travels.</p>
+
+        <div class="cards">
+          <div class="card">
+            <h3>The meaning layer</h3>
+            <p>The dictionaries a team authors — its record shapes, its kinds, its link types —
+              and the binding that checks every statement against its declared type.</p>
+            <p class="mut">Each statement carries its state: proposed, agreed, or frozen — and
+              only what is agreed or frozen may leave home.</p>
+          </div>
+          <div class="card">
+            <h3>The seal</h3>
+            <p>Who stands behind a slice — the seal, and the delegation chain behind it —
+              provenance a stranger can verify offline.</p>
+            <p class="mut">A seal proves <b>origin, never correctness</b> — the honesty every
+              trust chain owes its reader.</p>
+          </div>
+          <div class="card">
+            <h3>The package</h3>
+            <p>A frozen slice — a chosen part of the tree at one moment — travels with its
+              papers: what it is, which version, under which terms, from which source — one root
+              hash over the whole, one signature over that.</p>
+            <p class="mut">Adding a package <b>never runs anything</b> — plain, integrity-hashed
+              files only.</p>
+          </div>
+        </div>
+
+        <div class="chapters">
+          <h3 id="h-chapters">One specification — nine chapters and an annex</h3>
+          <p class="lead-p">Where the field has already solved a mechanism, the specification
+            adopts it by citation — BagIt's manifest rows, the WACZ integrity chain, DSSE
+            signature envelopes, SPDX license expressions. What no standard carries, it authors:
+            the dictionaries, the validity gradient, the attributed history, the delegation
+            behind an agent's work.</p>
+          <p class="spec-status mono"><b>v0</b> · draft RFC · Apache-2.0 · revised August 2026</p>
+
+          <ul class="ch-grid" aria-labelledby="h-chapters">
+            <li class="ch"><span class="num mono">1</span>
+              <p class="t"><b>The form.</b> <span>Ordinary files plus the sidecar; every layer
+                stands alone — a bare file tree already qualifies.</span></p></li>
+            <li class="ch"><span class="num mono">2</span>
+              <p class="t"><b>The dictionaries.</b> <span>One file per declared type — record
+                shapes as plain JSON Schema, kinds and link types beside them.</span></p></li>
+            <li class="ch"><span class="num mono">3</span>
+              <p class="t"><b>The tree profile.</b> <span>A stable identity per file — it
+                survives renames — the asserted graph, and attributed history under a
+                tamper-evident chain of hashes.</span></p></li>
+            <li class="ch"><span class="num mono">4</span>
+              <p class="t"><b>Validity.</b> <span>Proposed, agreed, frozen — and no change is
+                silent: every promotion is attributed, on the record; the boundary gates what
+                may travel.</span></p></li>
+            <li class="ch"><span class="num mono">5</span>
+              <p class="t"><b>Proposals.</b> <span>No merge, ever — an incoming version arrives
+                as a proposal with a field-wise diff, checkable before it lands.</span></p></li>
+            <li class="ch"><span class="num mono">6</span>
+              <p class="t"><b>The seal.</b> <span>Who stands behind a slice — one signature a
+                stranger verifies offline; work an agent authored carries its human's signed
+                authorization.</span></p></li>
+            <li class="ch"><span class="num mono">7</span>
+              <p class="t"><b>The package.</b> <span>A frozen slice with its shipping papers —
+                name, version, terms, source, one root hash, one signature binding
+                them.</span></p></li>
+            <li class="ch"><span class="num mono">8</span>
+              <p class="t"><b>Extension profiles.</b> <span>What a vendor adds beyond the
+                standard travels inside its own <code class="mono">x-</code> namespace — a
+                foreign reader may ignore it, never reject it.</span></p></li>
+            <li class="ch"><span class="num mono">9</span>
+              <p class="t"><b>The verbs.</b> <span>Reserved for the standing processes —
+                schedules, workflows, checks. It stays empty until the reference implementation
+                runs them end to end; nothing publishes ahead of use.</span></p></li>
+            <li class="ch"><span class="num mono">A</span>
+              <p class="t"><b>The mappings annex.</b> <span>Adapters, one page each — how the
+                form maps into and out of the shapes the field already speaks.</span></p></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ORIGIN BAND -->
+    <section class="band" aria-labelledby="h-band">
+      <div class="wrap">
+        <p class="eyebrow">An open standard — not a product</p>
+        <h2 class="lead-h" id="h-band">Substrate-independent. No gatekeeper.</h2>
+        <p class="lead-p">Koine is created by <a href="https://noebase.com" rel="noopener">NoeBase</a> —
+          the programmable workspace — and used there first: what teams program in the workspace
+          leaves it in this form. The standard itself belongs to everyone who implements it —
+          a koine tree can be written by hand, emitted by any tool, and read by any other.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer aria-labelledby="h-foot">
+    <div class="wrap">
+      <h2 id="h-foot" style="position:absolute;left:-9999px">About</h2>
+      <div class="foot-row">
+        <div class="left"><b>The Koine Format</b> — one open standard for knowledge that
+          outlives its author.</div>
+        <div class="right">by <a href="https://noebase.com" rel="noopener">NoeBase</a> — where thinking grows.</div>
+      </div>
+      <p class="foot-origin"><b>κοινή</b> <span class="ipa mono">/kɔɪˈnɛː/</span> — the common
+        tongue: the shared Greek that let strangers from different cities understand one another
+        without adopting anyone's dialect.</p>
+      <div class="foot-meta mono">
+        <span>koineformat.org</span>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

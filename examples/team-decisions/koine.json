@@ -1,0 +1,24 @@
+{
+  "koine": "0",
+  "name": "team-decisions",
+  "version": "2026.07.0",
+  "description": "How our team makes and records architectural decisions — the flagship example, kept current on main.",
+  "license": "CC-BY-4.0",
+  "source": {
+    "type": "git",
+    "url": "https://github.com/koineformat/koineformat",
+    "ref": "main",
+    "subpath": "examples/team-decisions"
+  },
+  "representations": [
+    "prose",
+    "graph"
+  ],
+  "provenance": {
+    "published_by": "noebase",
+    "published_at": "2026-08-24T14:27:42.749Z",
+    "method": "git-commit",
+    "signature": null
+  },
+  "integrity": "sha256:5288933d04539cff02e1cc782178e768d425d3f419d262b9aec9d5ab3d90dcc5"
+}

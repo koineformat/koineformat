@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Koine — "the shared form": two notations of different shape hold one
+       identical form between them. Sovereign vocabularies, one form.
+       Accent: terracotta #ad461a, inherited from the retired pinakes mark
+       (consolidation word 2026-08-18; previously olive #4a6b2f). -->
+  <path d="M7.6 5.2 L3.5 5.2 L3.5 18.8 L7.6 18.8" fill="none" stroke="#1a1813" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16.4 5.2 C21.1 7.9 21.1 16.1 16.4 18.8" fill="none" stroke="#1a1813" stroke-width="2.6" stroke-linecap="round"/>
+  <rect x="9.9" y="7.9" width="4.2" height="8.2" rx="2.1" fill="#ad461a"/>
+</svg>

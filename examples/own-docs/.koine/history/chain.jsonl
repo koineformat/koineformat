@@ -1,0 +1,4 @@
+{"format":"koine/chain@v0","algo":"commit = sha256(exact commit line bytes, utf-8, no trailing newline); hash = sha256(prev + commit) over the lowercase hex strings concatenated; genesis prev = 64 zeros"}
+{"seq":1,"commit":"3b676c125cb3650dcbcda2defd205ffd3d90c8b10184a24ffd7f87ee97e85c60","prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"71d2b557dcddf22d4e30ab25bfc4844376ac01c17f7c16e144a6404f12755249"}
+{"seq":2,"commit":"50d626e7ff8a415577a2773ae9345c3bed1e5b9f0206ab2902822169f3746dd9","prev":"71d2b557dcddf22d4e30ab25bfc4844376ac01c17f7c16e144a6404f12755249","hash":"6f6d0be96ed5c78678e258d1443bdd98be297ed6e1f27b4513a13e1bb85fde29"}
+{"seq":3,"commit":"2347b4892c6aebdef290af02bd581fa62c06349ed0f985b17ce7a467a9da63a5","prev":"6f6d0be96ed5c78678e258d1443bdd98be297ed6e1f27b4513a13e1bb85fde29","hash":"07b5f4210f3660dd9ae086ad9111114123408ce8f85a98ad21a386be45dbc66d"}

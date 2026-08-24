@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "koine/proposal@v0",
+  "title": "koine proposal",
+  "description": "The proposal envelope — the day-one gesture (Law 2: an incoming version is a proposal; the field-wise conflict list IS the merge). A proposal is a standalone whole item; per Law 4 it never travels inside the target repo.",
+  "type": "object",
+  "properties": {
+    "format": { "const": "koine/proposal@v0" },
+    "target": {
+      "type": "object",
+      "properties": {
+        "nodeId": { "type": "string", "description": "The target node's id from .koine/nodes.jsonl" },
+        "path": { "type": "string", "description": "The target's path at drafting time" },
+        "baseContentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "The target's contentHash the proposal was drafted against — staleness is mechanically detectable" }
+      },
+      "required": ["nodeId", "path", "baseContentHash"]
+    },
+    "baseChainHead": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "The history chain head at drafting time — a receiver can tell whether history moved since" },
+    "schema": { "type": "string", "description": "The declared record type the resulting shape is checked against (e.g. koine/types/metric-definition@v0)" },
+    "proposer": { "type": "string", "pattern": "^actor:(user|agent):", "description": "Who proposes. Authorship is attributed, not proven — proving it is the signing chapter" },
+    "when": { "type": "string", "format": "date-time", "description": "ISO-8601 UTC (Z), as everywhere in koine" },
+    "rationale": { "type": "string", "description": "Why — mirroring the commit's why" },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "rationale": { "type": "string" }
+        },
+        "required": ["field", "from", "to"]
+      },
+      "description": "The field-wise diff this proposal intends — receipt recomputes it and must agree"
+    },
+    "resultingShape": { "type": "object", "description": "The complete shape after applying the changes; MUST validate against the declared record type" },
+    "openQuestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "question": { "type": "string" }
+        },
+        "required": ["question"]
+      },
+      "description": "What the proposer could not decide — surfaced, never silently resolved"
+    },
+    "notes": { "type": "string" }
+  },
+  "required": ["format", "target", "baseChainHead", "schema", "proposer", "when", "rationale", "changes", "resultingShape"]
+}

@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    { "id": "adr-1", "label": "No code execution, ever", "kind": "principle" },
+    { "id": "adr-2", "label": "Thin envelope, free content", "kind": "principle" },
+    { "id": "adr-3", "label": "Vendored, not remote", "kind": "decision" },
+    { "id": "grep", "label": "Agent reads with grep/read/glob", "kind": "capability" }
+  ],
+  "edges": [
+    { "from": "adr-3", "to": "grep", "rel": "enables" },
+    { "from": "adr-2", "to": "adr-3", "rel": "supports" },
+    { "from": "adr-1", "to": "adr-3", "rel": "makes-safe" }
+  ]
+}

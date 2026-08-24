@@ -1,0 +1,8 @@
+{
+  "$id": "koine/types/definition@v0",
+  "name": "definition",
+  "description": "A node that declares what something IS — carries a shape block against a declared schema.",
+  "cascade": "cold",
+  "proactivity": "retrieve",
+  "contentFormat": "text"
+}

@@ -1,0 +1,8 @@
+{
+  "$id": "koine/types/references@v0",
+  "name": "references",
+  "description": "Source node cites or builds on the target node.",
+  "directed": true,
+  "transitive": false,
+  "weight": "none"
+}
