@@ -513,7 +513,7 @@ the identity map (§3.1).
 |---|---|
 | corpus identity | `name` |
 | version | `version` |
-| terms | `license` (+ the reserved `terms` block, §7.5) — one subject, two words: *terms* is the standard's, `license` is the field |
+| terms | `license` (+ the `terms` block, §7.5) — one subject, two words: *terms* is the standard's, `license` is the field |
 | source | `source` |
 | one root hash | `integrity` |
 | the signature binding them | `provenance.signature` |
@@ -553,8 +553,8 @@ forbidden.
 **What a validator MUST check.** A v0 validator MUST enforce `koine`, `name`, `version` and
 `integrity` — including path safety for every payload path it reads (§7.10). The remaining
 fields are carried through unvalidated in the reference implementation: a malformed `source`,
-`provenance`, `license`, `representations` or `description` is preserved rather than
-rejected. A producer therefore cannot rely on a consumer to catch a wrong shape in those
+`provenance`, `license`, `terms`, `representations` or `description` is preserved rather
+than rejected. A producer therefore cannot rely on a consumer to catch a wrong shape in those
 fields.
 
 **Representations *(OPEN)*.** `representations` is a free-form hint array (e.g. `"prose"`,
@@ -596,19 +596,97 @@ file at finer grain goes through the identity map (§3.2); the seal binds the pa
 the universal atom (npm, PEP 639, Cargo and the SBOM world all speak it), adopted by
 citation. It SHOULD be set; it answers *which license* and nothing else.
 
-**The priced half is reserved.** Knowledge that travels with terms richer than a license —
-payment types, permitted and prohibited uses, priced access — needs a vocabulary, and the
-field already has one: **RSL** (payment types such as `purchase` · `subscription` ·
-`training` · `crawl` · `use`; ISO-4217 amounts; permits/prohibits by usage, user and
-geography). What RSL cannot do is address *files inside a package* — its `url` is bound to
-an RFC 9309 robots path. **Package-relative addressing is the half-cell this standard
-fills:** a reserved top-level `terms` block whose entries address payload members by POSIX
-package-relative path or glob pattern, carrying the RSL vocabulary per entry.
+**The priced half — the `terms` block (frozen 2026-08-27).** Knowledge that travels with
+terms richer than a license — payment types, permitted and prohibited uses, priced access —
+needs a vocabulary, and the field has one: **[RSL 1.0](https://rslstandard.org/rsl)**, whose
+enumerated values this section adopts by citation, exactly as `license` adopts SPDX. What
+RSL cannot do is address *files inside a package* — its `url` is bound to an RFC 9309
+robots path — and it defines no JSON serialization at all. **This grammar is therefore
+authored:** it owns the carrier (a JSON block in `koine.json`) and the addressing (POSIX
+package-relative glob patterns), and takes its value vocabulary from RSL, so a publisher's
+package terms and their site-side RSL declarations speak the same words. The adopted axes,
+pinned to RSL 1.0 — the values below are normative here, so a dead upstream cannot orphan
+them:
 
-The `terms` block is **reserved, not yet normative**: its grammar freezes only after the
-pricing-grammar research pass ([Declared gaps](#declared-gaps)), and nothing here is owed by
-a v0 implementation beyond carrying the block through verbatim. Until it freezes, `license`
-is the terms paper.
+- **payment types:** `free` · `attribution` · `purchase` · `training` · `crawl` · `use`.
+  (RSL's `subscription` and `contribution` are deliberately not adopted — recurring billing
+  and patronage need duration state a frozen slice cannot carry; chapter 8 is their road
+  back.)
+- **permits/prohibits axes:** `usage` (`all` · `ai-all` · `ai-train` · `ai-input` ·
+  `ai-index` · `search`) · `user` (`commercial` · `non-commercial` · `education` ·
+  `government` · `personal`) · `geo` (ISO 3166-1 alpha-2 codes).
+
+**The shape.** The block is OPTIONAL; its absence means the whole package is free under
+`license`:
+
+```json
+"terms": {
+  "rsl": "1.0",
+  "attribution": { "name": "Acme Research", "url": "https://acme.example/koine" },
+  "payee": { "payTo": "0x1234…", "network": "eip155:8453", "asset": "0xA0b8…" },
+  "entries": [
+    {
+      "paths": ["**"],
+      "permits":   [{ "type": "usage", "values": ["search", "ai-index"] }],
+      "prohibits": [{ "type": "usage", "values": ["ai-train"] }],
+      "payment": { "type": "training", "amount": "5.00", "currency": "USD" }
+    }
+  ]
+}
+```
+
+- `rsl` — REQUIRED. The pinned vocabulary version; `"1.0"` is the only value this version
+  defines.
+- `attribution` — OPTIONAL: how to credit (defaults to the provenance block's publisher).
+  REQUIRED if any entry's payment type is `attribution`.
+- `payee` — the settlement rail: `payTo` (the recipient's address — the author's, never a
+  host's) · `network` (a CAIP-2 identifier) · `asset` (a token contract address, or an
+  ISO 4217 code for off-chain rails). OPTIONAL; REQUIRED as soon as any entry prices above
+  free. These three plus the price are exactly what an [x402](https://www.x402.org/) quote
+  needs — the block declares the offer, the payment layer transacts it.
+- `entries[]` — ordered. Each entry addresses payload members by POSIX package-relative
+  glob `paths` (default `["**"]`; §7.10 path safety applies) and carries `permits` /
+  `prohibits` arrays over the three axes plus one `payment` (`type`, with a decimal-string
+  `amount` + ISO 4217 `currency` REQUIRED unless the type is `free` or `attribution`).
+  Absent `entries` means one implicit free entry over `**`.
+
+**The laws.**
+
+- **Default free at every level.** No block, no `entries`, no `payment` — every absence
+  resolves to `free`. Declaring the axes costs a publisher nothing until something is
+  priced; that is the point of carrying them from day one.
+- **Precedence is document order — last match wins** for overlapping globs. Most-specific-
+  wins is undecidable for arbitrary globs; order is deterministic, and an author who wants
+  the specific entry to win writes it later.
+- **Per-release vs per-event rides the payment type**, no extra field: `purchase` buys this
+  release — this `version`, this `integrity` root; `training` · `crawl` · `use` are
+  per-event classes; `free` and `attribution` are unpriced.
+- **Two money layers, one direction.** The terms layer speaks human money (a decimal string
+  plus ISO 4217); the payment layer speaks atomic units of `payee.asset`. The conversion
+  happens at quote time by whatever serves the payment challenge — never in the manifest,
+  which stays human-legible and rail-agnostic.
+- **The seal is the tamper story.** `terms` lives in the manifest and the seal (chapter 6)
+  vouches for the manifest — so `payTo` sits inside the sealed papers, and redirecting
+  payment to an attacker's address means breaking the seal a buyer checks before paying.
+  The address travels with the goods, vouched, never fetched live from anyone.
+- **The block declares an offer; nothing here transacts.** Settlement, token issuance,
+  receipts and custody live outside the package. The place that serves a priced package
+  holds no funds and runs no licensing transaction — license-server protocols are
+  deliberately out of scope.
+- **Carrying stays free.** A consumer that does not act on terms MUST carry the block
+  through verbatim — unchanged from the block's reserved era. Only a consumer that acts on
+  them (quotes, pays, filters usage) must parse them, and an unknown key inside the block
+  is carried, never fatal. This is the deliberate opposite of ODRL's halt-on-unknown-
+  profile rule, and the reason ODRL is a mapping in Annex A rather than the base.
+- **A name, not a collision:** RSL's own `<terms>` XML element is a URL to supplemental
+  legal text, unrelated to this block. A human-readable terms page travels as an
+  `x-terms-url` extension key (chapter 8) until a field earns the slot.
+
+A declaration binds no one who never assents. What this block does, jurisdiction-free, is
+give machine-readable notice, state a machine-quotable offer, and — where such reservations
+are recognized — stand as a machine-readable reservation of rights for the `ai-train`
+class. It creates no copyright where none exists, and it discharges none of a seller's own
+obligations.
 
 ### 7.6 What may enter
 
@@ -983,6 +1061,18 @@ any other tree (chapter 7): *a skill you can trust is a skill with a koine sidec
 No mapping table is needed in this direction — the ride adds, it does not translate. The
 translation direction (a kind rendered *into* a skill folder) is an adapter page under A.1.
 
+### A.4 ODRL — the rights-world mapping *(informative)*
+
+[ODRL 2.2](https://www.w3.org/TR/odrl-model/) (W3C Recommendation) is the rights-expression
+base of the media world; a koine `terms` entry maps onto it mechanically, so a consumer that
+already speaks ODRL can translate rather than parse twice. The package is the policy's
+`target` (per-entry globs become member IRIs at translation time); `permits` / `prohibits`
+become `permission` / `prohibition` over `use`-class actions; a priced `payment` becomes a
+`compensate` duty carrying `payAmount` plus its currency; `attribution` becomes an
+`attribute` duty. The mapping is one-way and informative: ODRL requires IRIs where koine
+uses package-relative paths, and its conformance rule — halt on an unknown profile —
+contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and not the base.
+
 ## Declared gaps
 
 1. **Edge grounding.** How a declared edge relates to (absent) textual anchors in the
@@ -1001,10 +1091,9 @@ translation direction (a kind rendered *into* a skill folder) is an adapter page
    stay open, and neither is answered here: what that vocabulary should be, and **custody at
    record-type grain** — a kind carries its custody, a record type has nowhere to put one,
    and no home is invented for it in this version.
-5. **The terms pricing grammar** (§7.5). The `terms` block's exact grammar — the RSL
-   vocabulary profiled onto package-relative addressing — freezes after a dedicated legal
-   research pass (RSL/ODRL depth), never casually. Until then the block is reserved and
-   carried verbatim.
+5. **The terms pricing grammar (§7.5) — CLOSED 2026-08-27.** The research pass ran (RSL 1.0
+   read at source · ODRL 2.2 weighed and mapped in Annex A.4 · the x402 quote seam checked)
+   and §7.5 froze the grammar. The number stays so older references keep resolving.
 6. **Package-side opens, carried from the envelope's own draft:** versioning semantics
    (§7.9 — the hard one) · registry protocol and multi-registry trust (§7.8) ·
    `representations` (§7.3) · tarball/sourceless distribution and archive signing (§7.8) ·
@@ -1013,6 +1102,18 @@ translation direction (a kind rendered *into* a skill folder) is an adapter page
 ---
 
 ## Changelog
+
+### 2026-08-27 — the terms grammar freezes
+
+Declared gap 5 closes: §7.5's reserved `terms` block becomes normative. The grammar is
+authored — RSL defines no JSON carrier, so adopting one was never on the table — and takes
+its enumerated vocabulary from RSL 1.0 by citation (the payment types minus the two
+stateful ones; the usage/user/geo axes), owns POSIX package-relative glob addressing (the
+half-cell that justified the block), and carries exactly what an x402 quote needs (`payTo` ·
+`network` · `asset` · a decimal price). Default free at every level; document-order
+precedence; carry-verbatim stays legal for every consumer that does not act on terms.
+ODRL 2.2 becomes an informative mapping (new Annex A.4). No sidecar byte changes; a package
+without the block is byte-identical to before.
 
 ### 2026-08-24 — the consolidation re-cut
 
