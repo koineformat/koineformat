@@ -1,5 +1,5 @@
 /**
- * Path safety (U4 / SPEC §4.3, §10). A vendored package writes files into the
+ * Path safety (U4 / SPEC §7.10). A vendored package writes files into the
  * consumer's repo, so a hostile package MUST NOT be able to place a byte outside
  * its own directory. This module is the single choke point that proves a
  * package-relative path is safe, plus the size caps that refuse absurd packages.

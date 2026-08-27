@@ -26,7 +26,7 @@ export function manifestNameIn(files: ReadonlyMap<string, Uint8Array>, where: st
   return hasKoine ? MANIFEST_NAME : hasV0 ? MANIFEST_NAME_V0 : undefined;
 }
 
-/** SPEC §4.2: name MUST match this. */
+/** SPEC §7.3: name MUST match this. */
 export const NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
 
 const MEDIA_BY_EXT: Record<string, string> = {

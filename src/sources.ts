@@ -1,5 +1,5 @@
 /**
- * Source grammar (SPEC §6.1 subset) + resolution. v0 supports exactly two forms:
+ * Source grammar (SPEC §7.8 subset) + resolution. v0 supports exactly two forms:
  *
  *   github:owner/repo[/sub/path][#ref]   — fetched as a codeload tarball; no git
  *                                          binary required; the lock pins the SHA.

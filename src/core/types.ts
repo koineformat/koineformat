@@ -19,7 +19,7 @@ export interface ContentEntry {
   integrity: string;
 }
 
-/** Where a package authoritatively lives (SPEC §4.2 `source`). */
+/** Where a package authoritatively lives (SPEC §7.3 `source`). */
 export interface ManifestSource {
   type: "git" | "path" | "url";
   url?: string;
@@ -29,10 +29,10 @@ export interface ManifestSource {
 }
 
 /**
- * SPEC §8 provenance block — who published *this package*. Distinct from the two
- * other things the family spells `provenance`; see SPEC §4.2's field note.
+ * SPEC §7.3 provenance block — who published *this package*. Distinct from the two
+ * other things the family spells `provenance`; see SPEC §7.3's field note.
  *
- * `method` is carried through unvalidated (SPEC §4.2), so this union documents
+ * `method` is carried through unvalidated (SPEC §7.3), so this union documents
  * the vocabulary rather than gating it. `bip340` names the koine signing
  * chapter's scheme (koine SPEC §7); its binding rules live there, not here.
  */
@@ -87,7 +87,7 @@ export interface ResolvedRef {
   subpath?: string;
 }
 
-/** One installed package's row in the lockfile (SPEC §5.2). */
+/** One installed package's row in the lockfile (SPEC §7.7). */
 export interface LockEntry {
   /** The source string the consumer originally asked for. */
   requested: string;

@@ -1,5 +1,5 @@
 /**
- * Integrity (SPEC §4.3 / §8). Every file carries an SRI-style sha256 digest over
+ * Integrity (SPEC §7.4). Every file carries a sha256 digest over
  * its raw bytes. v0 supports sha256 only. Deterministic by construction (U2).
  *
  * Hashing goes through WebCrypto (`globalThis.crypto.subtle`), which every host
@@ -98,7 +98,7 @@ export async function rootHash(files: ReadonlyMap<string, Uint8Array>): Promise<
 }
 
 /**
- * The package fingerprint recorded in the lockfile (SPEC §5.2): a sha256 over
+ * The package fingerprint recorded in the lockfile (SPEC §7.7): a sha256 over
  * the *sorted* contents manifest. Independent of file order, so the same set of
  * files always yields the same digest.
  */

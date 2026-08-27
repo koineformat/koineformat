@@ -1,5 +1,5 @@
 /**
- * The eight invariants (SPEC.md §15, "Conformance invariants") as executable
+ * The eight invariants (SPEC.md §7.12, the U1–U8 tool bar) as executable
  * proof. Each `describe` block is one non-negotiable guarantee; if any goes red,
  * v0 is not done.
  */

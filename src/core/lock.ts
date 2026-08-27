@@ -1,5 +1,5 @@
 /**
- * The lockfile (SPEC §5.2): `knowledge/.pin-lock.json`, committed to the
+ * The lockfile (SPEC §7.7): `knowledge/.koine-lock.json`, committed to the
  * consumer repo. It is the source of truth for what is installed — the on-disk
  * directory name may differ from the package name, so we always go through here.
  *
