@@ -2,53 +2,194 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "koine/proposal@v0",
   "title": "koine proposal",
-  "description": "The proposal envelope — the day-one gesture (Law 2: an incoming version is a proposal; the field-wise conflict list IS the merge). A proposal is a standalone whole item; per Law 4 it never travels inside the target repo.",
+  "description": "The proposal envelope \u2014 the day-one gesture (Law 2: an incoming version is a proposal; the field-wise conflict list IS the merge). A proposal is a standalone whole item; per Law 4 it never travels inside the target repo. Two grains, one envelope: a SHAPE proposal changes a definition's declarations; a BODY proposal carries target.selector and one change whose field is \"body\", and is how a live editor's text range and this envelope express each other.",
   "type": "object",
   "properties": {
-    "format": { "const": "koine/proposal@v0" },
+    "format": {
+      "const": "koine/proposal@v0"
+    },
     "target": {
       "type": "object",
       "properties": {
-        "nodeId": { "type": "string", "description": "The target node's id from .koine/nodes.jsonl" },
-        "path": { "type": "string", "description": "The target's path at drafting time" },
-        "baseContentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "The target's contentHash the proposal was drafted against — staleness is mechanically detectable" }
+        "nodeId": {
+          "type": "string",
+          "description": "The target node's id from .koine/nodes.jsonl"
+        },
+        "path": {
+          "type": "string",
+          "description": "The target's path at drafting time"
+        },
+        "baseContentHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The target's contentHash the proposal was drafted against \u2014 staleness is mechanically detectable"
+        },
+        "selector": {
+          "type": "object",
+          "description": "OPTIONAL Locator selector (SPEC 3.4) \u2014 where inside the addressed version the change lands. Required for a body proposal; its absence makes the proposal shape-grained.",
+          "properties": {
+            "type": {
+              "enum": [
+                "text-quote",
+                "text-position",
+                "line-range",
+                "page",
+                "time-range",
+                "json-pointer"
+              ]
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
       },
-      "required": ["nodeId", "path", "baseContentHash"]
+      "required": [
+        "nodeId",
+        "path",
+        "baseContentHash"
+      ]
     },
-    "baseChainHead": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "The history chain head at drafting time — a receiver can tell whether history moved since" },
-    "schema": { "type": "string", "description": "The declared record type the resulting shape is checked against (e.g. koine/types/metric-definition@v0)" },
-    "proposer": { "type": "string", "pattern": "^actor:(user|agent):", "description": "Who proposes. Authorship is attributed, not proven — proving it is the signing chapter" },
-    "when": { "type": "string", "format": "date-time", "description": "ISO-8601 UTC (Z), as everywhere in koine" },
-    "rationale": { "type": "string", "description": "Why — mirroring the commit's why" },
+    "baseChainHead": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The history chain head at drafting time \u2014 a receiver can tell whether history moved since"
+    },
+    "schema": {
+      "type": "string",
+      "description": "The declared record type the resulting shape is checked against (e.g. koine/types/metric-definition@v0)"
+    },
+    "proposer": {
+      "type": "string",
+      "pattern": "^actor:(user|agent):",
+      "description": "Who proposes. Authorship is attributed, not proven \u2014 proving it is the signing chapter"
+    },
+    "when": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC (Z), as everywhere in koine"
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Why \u2014 mirroring the commit's why"
+    },
     "changes": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "properties": {
-          "field": { "type": "string" },
-          "from": { "type": "string" },
-          "to": { "type": "string" },
-          "rationale": { "type": "string" }
+          "field": {
+            "type": "string",
+            "description": "The declaration's key, or the reserved name \"body\" for a change to the addressed region of the body itself"
+          },
+          "from": {
+            "description": "Any JSON. OMIT the key to mean the field is absent on this side (an addition); null is the JSON value null, a different fact"
+          },
+          "to": {
+            "description": "Any JSON. OMIT the key to mean the field is absent on this side (a removal); null is the JSON value null, a different fact"
+          },
+          "rationale": {
+            "type": "string"
+          }
         },
-        "required": ["field", "from", "to"]
+        "required": [
+          "field"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "from"
+            ]
+          },
+          {
+            "required": [
+              "to"
+            ]
+          }
+        ]
       },
-      "description": "The field-wise diff this proposal intends — receipt recomputes it and must agree"
+      "description": "The field-wise diff this proposal intends \u2014 receipt recomputes it and must agree. A change omitting both from and to is not a change."
     },
-    "resultingShape": { "type": "object", "description": "The complete shape after applying the changes; MUST validate against the declared record type" },
+    "resultingShape": {
+      "type": "object",
+      "description": "The complete shape after applying the changes; MUST validate against the declared record type. Absent for a body proposal \u2014 prose has no declared shape."
+    },
     "openQuestions": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "field": { "type": "string" },
-          "question": { "type": "string" }
+          "field": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          }
         },
-        "required": ["question"]
+        "required": [
+          "question"
+        ]
       },
-      "description": "What the proposer could not decide — surfaced, never silently resolved"
+      "description": "What the proposer could not decide \u2014 surfaced, never silently resolved"
     },
-    "notes": { "type": "string" }
+    "notes": {
+      "type": "string"
+    }
   },
-  "required": ["format", "target", "baseChainHead", "schema", "proposer", "when", "rationale", "changes", "resultingShape"]
+  "required": [
+    "format",
+    "target",
+    "baseChainHead",
+    "schema",
+    "proposer",
+    "when",
+    "rationale",
+    "changes"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "properties": {
+                "field": {
+                  "const": "body"
+                }
+              },
+              "required": [
+                "field"
+              ]
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "required": [
+              "selector"
+            ]
+          }
+        },
+        "not": {
+          "required": [
+            "resultingShape"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "resultingShape"
+        ]
+      }
+    }
+  ]
 }

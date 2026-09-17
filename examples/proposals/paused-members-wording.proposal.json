@@ -1,0 +1,31 @@
+{
+  "format": "koine/proposal@v0",
+  "target": {
+    "nodeId": "n-d27727adce6c",
+    "path": "definitions/active-member.md",
+    "baseContentHash": "sha256:86af1c2518b7b88d8517fe831ae1beba644721dcb879750066cf66c7720da5d9",
+    "selector": {
+      "type": "text-quote",
+      "exact": "Paused members **remain in the population**",
+      "suffix": " \u2014 pausing suspends notification"
+    }
+  },
+  "baseChainHead": "07b5f4210f3660dd9ae086ad9111114123408ce8f85a98ad21a386be45dbc66d",
+  "schema": "koine/types/metric-definition@v0",
+  "proposer": "actor:user:a-foreign-reader",
+  "when": "2026-09-17T11:00:00Z",
+  "rationale": "The sentence reads as a rule; it is a consequence of the window. Saying so where a reader meets it saves the re-derivation.",
+  "changes": [
+    {
+      "field": "body",
+      "from": "Paused members **remain in the population**",
+      "to": "Paused members **remain in the population**, and nothing has to enforce that"
+    }
+  ],
+  "openQuestions": [
+    {
+      "question": "This changes prose, not a declaration \u2014 the shape block is untouched, so the definition's state does not move. Applied by anyone but the declared owner it still lands at draft (chapter 4, rule 2). Is that the intent for a wording change?"
+    }
+  ],
+  "notes": "The body grain: the target carries a Locator, and the one change names the reserved field \"body\". Before 3.4 this proposal could not be written \u2014 this envelope was field-grained and an editor's range is text-grained."
+}

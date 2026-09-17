@@ -475,31 +475,67 @@ A proposal is a **standalone whole item** (typically sub-kilobyte). Per Law 4 it
 travels *inside* the target tree — it rides any carrier: a PR, an email, a relay, a message.
 Its parts:
 
-- **`target`** — node id, path, and `baseContentHash`: the content the proposal was drafted
-  against. Staleness is mechanically detectable, never discovered mid-apply.
+- **`target`** — node id, path, `baseContentHash`, and optionally a **`selector`** (§3.4):
+  the content the proposal was drafted against, and where inside it the change lands.
+  Staleness is mechanically detectable, never discovered mid-apply.
 - **`baseChainHead`** — the history head at drafting time: the receiver can tell whether
   history moved since.
 - **`changes`** — the field-wise diff (`field` · `from` · `to`), the proposal's whole intent.
+  **`from` and `to` are arbitrary JSON**, and either may be **OMITTED to mean the field is
+  absent on that side** — an addition, or a removal. `null` is the JSON value null and is a
+  different fact; JSON cannot write *not there* as a value, so the key's presence carries it.
+  A change omitting both is not a change.
 - **`resultingShape`** — the complete shape after the changes, checkable against the declared
-  record type in `schema`.
+  record type in `schema`. Absent for a body proposal (below): prose has no declared shape.
 - **`openQuestions`** — what the proposer could NOT decide, surfaced instead of silently
   resolved (a judgment call the shape cannot make for them).
 - **`proposer` · `when` · `rationale`** — attribution (attributed, not proven — proving is
   chapter 6).
 
+**Two grains, one envelope.** A **shape proposal** changes a definition's declarations — the
+original gesture, field-wise, checked against the record type. A **body proposal** changes an
+addressed REGION of a body: `target.selector` says where, and `changes` is exactly one change
+whose `field` is the reserved name **`body`**, with `from`/`to` the region's current and
+proposed text. One reserved name keeps the diff field-wise, which is Law 2's shape, while
+letting an end land on prose.
+
+**That second grain is what §3.4 bought, and it was a real impasse.** This envelope's target
+was field-grained and a live editor's proposal is a text range, so *the day-one gesture and
+the day-one gesture could not express each other* — a foreign consumer could read a package
+and never answer it in the grain it works in.
+
 **Receipt semantics (normative).** A receiver, in order: (1) validate the envelope against
 `koine/proposal@v0`; (2) check staleness — `target.baseContentHash` against the current
 `nodes.jsonl` entry, `baseChainHead` against the current chain head; a stale proposal is
 re-based or returned, never force-applied; (3) validate `resultingShape` against the declared
-record type; (4) recompute `diff(currentShape, resultingShape)` — it MUST equal `changes`,
-else the proposal is internally inconsistent and rejected; (5) produce the conflict list:
-each change is classified **both-intentional** (a human decides) or **one-is-wrong** (the
-shape itself convicts — e.g. a rate without a denominator). The conflict list is the output
-of receipt, not its cost.
+record type — for a body proposal, resolve `target.selector` against the current body instead,
+where `stale` or `not-found` is a staleness verdict and never an apply; (4) recompute
+`diff(currentShape, resultingShape)` — it MUST equal `changes`, else the proposal is
+internally inconsistent and rejected; for a body proposal, the addressed region MUST equal the
+change's `from`; (5) produce the conflict list: each change is classified **both-intentional**
+(a human decides) or **one-is-wrong** (the shape itself convicts — e.g. a rate without a
+denominator). The conflict list is the output of receipt, not its cost.
+
+**How the two classifications are decided, mechanically.** A change whose `from` still equals
+what the holder has is no conflict at all — the base is intact for that field. Where they
+differ: if either candidate makes the resulting shape fail its record type, the shape has
+convicted one of them and the verdict is **`one-is-wrong`** — no human is needed. If both
+candidates are legal shapes, two people meant different things and only a person can choose:
+**`both-intentional`**.
+
+**Receipt never writes.** A receiver that applied as it read would make step 5 unobservable,
+and the conflict list is the whole product.
 
 **Acceptance semantics.** On acceptance the holder: edits the body, recomputes the node's
-`contentHash`, and appends one commit + one chain link (§3.3). History is append-only —
-prior values remain as record, never edited.
+`contentHash`, and appends one commit + one chain link (§3.3) — **bound to the node it
+touched, via the commit's `node` field**. History is append-only — prior values remain as
+record, never edited. An accepted proposal is thereafter stale against the tree it was applied
+to, which is how a second holder learns not to apply it twice.
+
+**A normative MUST with no reference implementation is not normative; it is a wish.** This
+chapter carried five ordered MUSTs, a schema and a worked example for a year with no receiver
+on either side of the boundary, so nobody could check anyone's conformance to it — these
+editors' own included. The receiver ships with this revision.
 
 ## 6. The seal — proof of origin
 
@@ -1410,6 +1446,40 @@ contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and 
 ---
 
 ## Changelog
+
+### 2026-09-17 — the receiver: the day-one gesture gets an implementation
+
+Chapter 5 declared receipt semantics **normative**, in five ordered steps, and shipped a
+schema and a worked example. `grep -rni proposal src/` returned **one comment**. There was no
+receiver, no apply path and no fixtures, on either side of the boundary — so a package could
+be read and never answered, and nobody could check anyone's conformance to the chapter, these
+editors included. **A normative MUST with no reference implementation is not normative; it is
+a wish.**
+
+- **The receiver ships**, all five steps in order, and it never writes: receipt produces the
+  conflict list, acceptance is a separate act. A receiver that applied as it read would make
+  step 5 unobservable.
+- **The two classifications are now mechanical.** A change whose `from` still equals what the
+  holder has is no conflict. Where they differ: if either candidate makes the resulting shape
+  fail its record type the shape has convicted one of them — **`one-is-wrong`**, no human
+  needed; if both are legal, **`both-intentional`**.
+- **`changes[].from`/`.to` are arbitrary JSON.** The v0 schema admitted strings only while
+  `resultingShape` carried general JSON, so a change to a number or a nested object was
+  unexpressible in the diff that is required to EQUAL it. An **omitted** `from` or `to` now
+  means the field is absent on that side — an addition or a removal — and `null` stays the
+  JSON value null; JSON cannot write *not there* as a value, so the key's presence carries it.
+- **A second grain: the body proposal.** `target` may carry a `selector` (§3.4), and a change
+  whose `field` is the reserved name `body` replaces the addressed region. This closes a real
+  impasse: the envelope was field-grained and a live editor's proposal is a text range, so
+  *the day-one gesture and the day-one gesture could not express each other.* One reserved
+  name keeps the diff field-wise, which is Law 2's shape, while letting an end land on prose.
+- **Acceptance binds its commit to the node it touched** (§3.3's `node`), so the ritual the
+  chapter describes is verifiable rather than asserted. An accepted proposal is thereafter
+  stale against the tree it was applied to — which is how a second holder learns not to apply
+  it twice.
+
+A second worked example ships beside the first: `examples/proposals/paused-members-wording.proposal.json`,
+the body grain, received and accepted against the example tree in this package's own suite.
 
 ### 2026-09-17 — the verdict: must-understand, and a package's honesty about itself
 

@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { join, relative } from 'node:path'
 import { emitKoineTree, parseKoineTree, verifyKoineTree } from '../src/tree.js'
 import { emitRecordTypeJson, parseRecordTypeJson } from '../src/dictionaries.js'
+import { acceptProposal, receiveProposal, validateProposalEnvelope, type KoineProposal } from '../src/proposal.js'
 
 const ROOT = fileURLToPath(new URL('../examples/own-docs', import.meta.url))
 
@@ -132,5 +133,77 @@ describe('examples/own-docs — the codec against a tree it did not write', () =
     // The whole of the difference, named rather than tolerated: where `$id` sits.
     expect(Object.keys(committed)[0]).toBe('$schema')
     expect(Object.keys(reEmitted)[0]).toBe('$id')
+  })
+})
+
+/**
+ * The shipped proposals, received against the tree they were drafted against.
+ *
+ * This is the cross-implementation conformance test for chapter 5: the tree's
+ * sidecars came from the Python generator, the proposals were hand-authored,
+ * and the receiver is this package's. Nothing here is a fixture written to pass.
+ */
+describe('examples/proposals — the day-one gesture, against the tree it targets', () => {
+  const proposalsDir = fileURLToPath(new URL('../examples/proposals', import.meta.url))
+
+  it('both shipped proposals are well-formed envelopes', async () => {
+    for (const name of await readdir(proposalsDir)) {
+      const proposal = JSON.parse(await readFile(join(proposalsDir, name), 'utf8')) as unknown
+      expect([name, validateProposalEnvelope(proposal)]).toEqual([name, []])
+    }
+  })
+
+  it('receives the shape proposal cleanly — no conflict, and its open question is carried', async () => {
+    const files = await readTree(ROOT)
+    const tree = parseKoineTree(files)
+    const proposal = JSON.parse(
+      await readFile(join(proposalsDir, 'active-member-60d.proposal.json'), 'utf8'),
+    ) as KoineProposal
+    const receipt = receiveProposal(proposal, tree, files)
+    expect(receipt.status).toBe('ready')
+    expect(receipt.conflicts).toEqual([])
+    expect(receipt.openQuestions).toHaveLength(1)
+  })
+
+  it('receives the BODY proposal — the grain that could not be expressed before §3.4', async () => {
+    const files = await readTree(ROOT)
+    const tree = parseKoineTree(files)
+    const proposal = JSON.parse(
+      await readFile(join(proposalsDir, 'paused-members-wording.proposal.json'), 'utf8'),
+    ) as KoineProposal
+    expect(receiveProposal(proposal, tree, files).status).toBe('ready')
+
+    // …and accepting it edits the addressed region and nothing else.
+    const body = text(files.get('definitions/active-member.md') as Uint8Array)
+    const accepted = acceptProposal(proposal, body, '2026-09-17T12:00:00Z')
+    expect(accepted.bytes).toContain('and nothing has to enforce that')
+    expect(accepted.bytes).toContain('kind: metric-definition')
+    expect(accepted.commit.node).toBe('n-d27727adce6c')
+    // The shape block is untouched, so the definition's state does not move.
+    expect(accepted.bytes).toContain('state: valid')
+  })
+
+  it('returns a shipped proposal as STALE once its target has been accepted', async () => {
+    const files = await readTree(ROOT)
+    const tree = parseKoineTree(files)
+    const proposal = JSON.parse(
+      await readFile(join(proposalsDir, 'active-member-60d.proposal.json'), 'utf8'),
+    ) as KoineProposal
+    const body = text(files.get('definitions/active-member.md') as Uint8Array)
+    const accepted = acceptProposal(proposal, body, '2026-09-17T12:00:00Z')
+    const after = await emitKoineTree({
+      nodes: tree.nodes.map((n) => ({
+        id: n.id,
+        path: n.path,
+        format: n.format,
+        bytes: n.path === accepted.path ? accepted.bytes : (files.get(n.path) as Uint8Array),
+      })),
+      edges: [...tree.edges],
+      commits: [...tree.commits, { seq: tree.commits.length + 1, ...accepted.commit }],
+      types: tree.dictionaries,
+    })
+    const reread = parseKoineTree(after)
+    expect(reread.commits.at(-1)?.node).toBe('n-d27727adce6c')
+    expect(receiveProposal(proposal, reread, after).status).toBe('stale')
   })
 })

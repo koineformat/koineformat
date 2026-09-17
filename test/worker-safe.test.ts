@@ -118,6 +118,7 @@ describe('worker-safe by construction', () => {
       'src/dictionaries.ts',
       'src/index.ts',
       'src/locator.ts',
+      'src/proposal.ts',
       'src/schema.ts',
       'src/sha256.ts',
       'src/shape.ts',
