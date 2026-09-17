@@ -114,6 +114,7 @@ describe('worker-safe by construction', () => {
   it('reaches every module of the codec, so the walk above is not vacuous', () => {
     const { files } = walk(join(ROOT, 'src/index.ts'), fromSource)
     expect(files.map((f) => relative(ROOT, f)).sort()).toEqual([
+      'src/capabilities.ts',
       'src/dictionaries.ts',
       'src/index.ts',
       'src/locator.ts',

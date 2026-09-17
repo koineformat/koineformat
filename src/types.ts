@@ -37,6 +37,38 @@ export interface KoineNodeEntry {
    * rather than a law.
    */
   readonly state?: KoineValidity
+  /**
+   * Present when this body is REFERENCED and NOT CARRIED (SPEC §3.2).
+   *
+   * Without it, a package can reference a body it does not carry only by
+   * leaving it out — which is indistinguishable from not referencing it at all,
+   * so a reader cannot tell an incomplete package from a complete one and a
+   * required-but-absent body cannot block anything.
+   *
+   * `contentHash` stays the ABSENT body's digest. That is what makes the
+   * declaration useful rather than a note: a receiver that obtains the body
+   * elsewhere can check that it is the right one.
+   *
+   * A tree carrying this MUST declare the `absent-body` capability (§8.1) — a
+   * reader that ignored the key would conclude it holds everything.
+   */
+  readonly absent?: KoineAbsentBody
+}
+
+/** Why a referenced body is not carried, and whether its absence is disabling. */
+export interface KoineAbsentBody {
+  /**
+   * A short recording of why — `oversize`, `restricted`, `by-reference`.
+   * A recording, not a vocabulary: this specification declares none, for the
+   * same reason it declares none for `format` (declared gap 3).
+   */
+  readonly reason?: string
+  /**
+   * True when a consumer MUST NOT activate the package without this body.
+   * Absent reads as false: a package may be honestly incomplete and still
+   * useful, and being able to say which it is IS the declaration.
+   */
+  readonly required?: boolean
 }
 
 /**
@@ -285,6 +317,31 @@ export interface KoineTypeSet {
   readonly edges?: readonly KoineEdgeType[]
 }
 
+/**
+ * A body that is REFERENCED and NOT CARRIED, going into `emitKoineTree`.
+ *
+ * It has no bytes, so the producer supplies the digest — which is the entire
+ * value of declaring the absence: a receiver that obtains the body elsewhere can
+ * check that it is the right one, and a required-but-absent body can block
+ * activation instead of being discovered at install.
+ */
+export interface KoineAbsentNodeInput {
+  readonly id: string
+  readonly path: string
+  readonly format: string
+  /** The digest of the body that is NOT here. */
+  readonly contentHash: KoineContentHash
+  readonly absent: KoineAbsentBody
+  readonly state?: KoineValidity
+}
+
+/** Either arm of what `emitKoineTree` accepts as a node: a carried body, or a declared absence. */
+export type KoineNodeInput = KoineTreeNodeInput | KoineAbsentNodeInput
+
+/** True when this input declares an absence rather than carrying a body. */
+export const isAbsentNodeInput = (node: KoineNodeInput): node is KoineAbsentNodeInput =>
+  (node as KoineAbsentNodeInput).absent !== undefined
+
 /** One floor-0 body going into `emitKoineTree` — bytes plus declared identity. */
 export interface KoineTreeNodeInput {
   readonly id: string
@@ -309,10 +366,20 @@ export interface KoineTreeNodeInput {
 
 /** Everything `emitKoineTree` accepts. SPEC Law 4's exclusions are typed away: there is no field for membership, permissions, presence, secrets or pending proposals. */
 export interface KoineTreeInput {
-  readonly nodes: readonly KoineTreeNodeInput[]
+  readonly nodes: readonly KoineNodeInput[]
   readonly edges?: readonly KoineEdgeEntry[]
   readonly commits?: readonly KoineCommit[]
   readonly types?: KoineTypeSet
+  /**
+   * Capability tokens a reader MUST implement to read this tree faithfully
+   * (SPEC §8.1) — emitted as `.koine/requires.json`.
+   *
+   * Some facets are mandatory to declare when used, because ignoring one makes
+   * a reader draw a confident WRONG conclusion rather than an incomplete one:
+   * `absent-body` is the first. Emit refuses a tree that uses such a facet and
+   * does not require it.
+   */
+  readonly requires?: readonly string[]
 }
 
 /** Emit options. `frozenSlice` applies the travel law (SPEC §4 rule 4). */
@@ -341,6 +408,12 @@ export interface ParsedKoineTree {
   readonly dictionaries: KoineTypeSet
   /** Every non-`.koine/` file, verbatim. */
   readonly bodies: ReadonlyMap<string, Uint8Array | string>
+  /**
+   * What a reader MUST implement to read this tree faithfully (§8.1), from
+   * `.koine/requires.json`. Empty when the tree demands nothing beyond the core
+   * — which is every tree written before the mechanism existed.
+   */
+  readonly requires: readonly string[]
 }
 
 /**

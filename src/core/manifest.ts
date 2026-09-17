@@ -9,6 +9,7 @@
 import type { ContentEntry, Manifest } from "./types.js";
 import { SPEC_VERSION } from "./types.js";
 import { errAmbiguousEnvelope, errBadManifest, errUnsupportedSpec } from "./errors.js";
+import { requiresProblem } from "../capabilities.js";
 import { assertSafeRelPath } from "./paths.js";
 import { sha256, verifyIntegrity } from "./integrity.js";
 
@@ -83,6 +84,22 @@ export function validateManifest(value: unknown): Manifest {
   const version = value["version"];
   if (typeof version !== "string" || version.length === 0) {
     throw errBadManifest(`"version" is required (an opaque, orderable label)`);
+  }
+
+  // `requires` is the ONE accompanying field that is validated rather than
+  // carried through (SPEC §7.3, §8.1). Everything else a validator waves past is
+  // information a consumer may ignore; this one is the list of things it may NOT
+  // — so a `requires` a reader cannot parse is a `requires` it cannot honour, and
+  // carrying it through unvalidated would defeat the mechanism at its first use.
+  if (value["requires"] !== undefined) {
+    const problem = requiresProblem(value["requires"]);
+    if (problem !== undefined) throw errBadManifest(problem);
+  }
+  if (value["status"] !== undefined) {
+    const status = value["status"];
+    if (typeof status !== "string" || !/^https?:\/\//.test(status)) {
+      throw errBadManifest(`"status" must be an absolute http(s) URL — where this package's standing is published`);
+    }
   }
 
   if (specField === "koine") {

@@ -19,6 +19,7 @@ import {
   KoineParseError,
   type KoineChainHeader,
   type KoineChainLink,
+  type KoineAbsentBody,
   type KoineCommit,
   type KoineEdgeEntry,
   type KoineNodeEntry,
@@ -115,6 +116,16 @@ export function emitNodesJsonl(entries: readonly KoineNodeEntry[]): string {
         // different facts (SPEC §4 rule 4), and a tree written before the field
         // existed must re-emit byte-identically.
         ...(e.state !== undefined ? { state: e.state } : {}),
+        // Present ONLY when the body is referenced and not carried. The key's
+        // presence is the declaration; its object may legitimately be empty.
+        ...(e.absent !== undefined
+          ? {
+              absent: {
+                ...(e.absent.reason !== undefined ? { reason: e.absent.reason } : {}),
+                ...(e.absent.required !== undefined ? { required: e.absent.required } : {}),
+              },
+            }
+          : {}),
       }),
     )
     .map((l) => `${l}\n`)
@@ -139,8 +150,27 @@ export function parseNodesJsonl(text: string): KoineNodeEntry[] {
       format: requireString(file, i, row, 'format'),
       contentHash: contentHash as KoineNodeEntry['contentHash'],
       ...(state !== undefined ? { state: state as KoineValidity } : {}),
+      ...(row['absent'] !== undefined ? { absent: parseAbsent(file, i + 1, row['absent']) } : {}),
     }
   })
+}
+
+/** `absent` is an object whose PRESENCE is the declaration; both its fields are optional. */
+function parseAbsent(file: string, line: number, raw: unknown): KoineAbsentBody {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new KoineParseError(file, line, '"absent" must be a JSON object')
+  }
+  const value = raw as Record<string, unknown>
+  if (value['reason'] !== undefined && (typeof value['reason'] !== 'string' || value['reason'] === '')) {
+    throw new KoineParseError(file, line, '"absent.reason" is present and is not a non-empty string')
+  }
+  if (value['required'] !== undefined && typeof value['required'] !== 'boolean') {
+    throw new KoineParseError(file, line, '"absent.required" is present and is not a boolean')
+  }
+  return {
+    ...(value['reason'] !== undefined ? { reason: value['reason'] as string } : {}),
+    ...(value['required'] !== undefined ? { required: value['required'] as boolean } : {}),
+  }
 }
 
 // ---------------------------------------------------------------------------

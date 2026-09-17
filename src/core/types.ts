@@ -64,11 +64,53 @@ export interface Manifest {
   source?: ManifestSource;
   representations?: string[];
   provenance?: Provenance;
+  /**
+   * Capability tokens a consumer MUST implement to use this package (SPEC §8.1).
+   *
+   * The must-understand half of the extension surface. Without it koine's only
+   * extension shape was `x-`, which §7.5 makes explicitly ignorable — the right
+   * rule for an optional facet and the wrong one for a publication or retraction
+   * rule a receiver must honour or refuse.
+   */
+  requires?: string[];
+  /**
+   * Where this package's own status is published (SPEC §7.3) — an absolute URL.
+   *
+   * *"Offline verifiability of an old package does not prove it may still be
+   * used today."* A withdrawn or superseded package verifies forever and keeps
+   * answering; what the form owes is one DECLARATION of where the answer lives,
+   * and what a reader must do when it cannot be reached. The revocation
+   * *service* stays outside the format.
+   */
+  status?: string;
   /** koine form: ONE root hash over the canonical tree listing, "sha256:<hex>" (SPEC §7.4). */
   integrity?: string;
   /** v0 dialect only: every shipped file except pin.json itself. */
   contents?: ContentEntry[];
 }
+
+/** What a package's declared status source answers (SPEC §7.3). */
+export interface PackageStatusDocument {
+  /** Spec version this status document targets. */
+  koine: string;
+  status: "current" | "superseded" | "withdrawn";
+  /** ISO-8601 UTC (`Z`) — since when. */
+  since?: string;
+  /** For "superseded": the package version that replaces this one. */
+  supersededBy?: string;
+  /** Free prose for a human reading the verdict. */
+  note?: string;
+}
+
+/**
+ * What a consumer concluded about a package's current standing.
+ *
+ * `possibly-stale` is the answer for an unreachable status source, and it is the
+ * whole reason the shape has three values instead of a boolean: a reader that
+ * rendered an unreachable source as `current` would be asserting exactly what it
+ * failed to check.
+ */
+export type PackageStanding = "current" | "superseded" | "withdrawn" | "possibly-stale" | "undeclared";
 
 /** Which envelope dialect a validated manifest speaks. */
 export type ManifestDialect = "koine" | "v0";

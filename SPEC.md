@@ -224,7 +224,7 @@ and only the edge *type* (§2.1) is vocabulary.
 ### 3.2 `nodes.jsonl` and `edges.jsonl` — identity and the asserted graph
 
 - **`nodes.jsonl`** — the identity map. One JSON object per line:
-  `{"id", "path", "format", "contentHash", "state"?}`. `id` is stable across renames;
+  `{"id", "path", "format", "contentHash", "state"?, "absent"?}`. `id` is stable across renames;
   `contentHash` is `"sha256:" + lowercase-hex sha256 of the file's exact bytes`. No id scheme
   is prescribed — only that an id outlives a path.
 
@@ -237,6 +237,28 @@ and only the edge *type* (§2.1) is vocabulary.
   that is correct, not a shortfall. **The key is omitted when the body is on no gradient at
   all**, and absent is NOT the same fact as `"state":"spoken"`; chapter 4's travel law turns
   on exactly that difference.
+
+  **`absent` says this body is REFERENCED and NOT CARRIED** — `{"reason"?, "required"?}`, the
+  key's presence being the declaration. Without it a package can reference a body it does not
+  carry only by leaving it out, which is indistinguishable from not referencing it — so a
+  reader cannot tell an incomplete package from a complete one, and a required-but-absent body
+  cannot block anything. **`contentHash` stays the digest of the body that is not here**, and
+  that is what makes the declaration useful rather than a note: a receiver that obtains the
+  body elsewhere can check that it is the right one. `reason` is a short recording
+  (`oversize`, `restricted`, `by-reference`) and this document declares no vocabulary for it,
+  for the same reason it declares none for `format`. `required: true` means a consumer MUST
+  NOT activate the package without the body; absent reads as false, because **a package may be
+  honestly incomplete and still useful, and being able to say which it is IS the declaration.**
+
+  A tree using `absent` MUST require the `absent-body` capability (§8.1), and this is stronger
+  than a verification rule: a reader that ignores the key concludes it holds everything, so an
+  emitter MUST refuse to write such a tree and a parser MUST refuse to read it. Note what this
+  is NOT: raising a package's size caps. Those limits are the right size for knowledge and the
+  wrong size for evidence, and moving them solves nothing about access, transfer or restore.
+
+  **Verification asks an absent row the opposite question** (§3.5): the tree MUST NOT carry a
+  body it declares absent. A row claiming absence over a present file is a package lying about
+  itself in the safest-looking way.
 
 - **`edges.jsonl`** — the typed graph slice: `{"from", "to", "type"}` over node ids; `type`
   names an edge type declared in `types/`. An edge a reader can recompute from the bodies (a
@@ -670,6 +692,9 @@ the identity map (§3.1).
   "license": "CC-BY-4.0",               // terms: an SPDX license expression (§7.5)
   "readingFloor": 1,                    // which floor faithful consumption requires (§7.6)
 
+  "requires": ["absent-body"],          // what a consumer MUST implement, or refuse (§8.1)
+  "status": "https://acme.example/pkg/team-decisions/status.json",  // where this package's standing is published
+
   "source": {                           // where this package authoritatively lives
     "type": "git",                      // "git" | "path" | "url"
     "url": "https://github.com/acme/team-decisions",
@@ -701,9 +726,10 @@ the identity map (§3.1).
 
 The **`koine` spec-version field is retained and is not one of the six**: refusal semantics
 are unimplementable without it — a consumer MUST refuse a manifest whose major version it
-does not understand. `description`, `readingFloor`, `representations` and the remaining
+does not understand. `description`, `readingFloor`, `representations`, `status` and the remaining
 `provenance` subfields are **legal accompanying fields** — not irreducible, not thereby
-forbidden.
+forbidden. **`requires` is accompanying but not optional to READ**: it is the list of things a
+consumer may not ignore, so §8.1 requires a validator to parse it (see below).
 
 **Field notes**
 
@@ -727,15 +753,47 @@ forbidden.
   a vendor profile keyword `provenance` inside a record type's JSON Schema is a
   **field-grain derived-from** rule (chapter 8). `method` names the signing scheme;
   `bip340` is chapter 6's profile, whose binding rules live there.
+- `requires` — capability tokens a consumer MUST implement to use this package, or refuse it
+  by name (§8.1). Absent means the package demands nothing beyond the core.
+- `status` — an absolute `http(s)` URL where this package's own standing is published.
+  **Offline verifiability of an old package does not prove it may still be used today**: a
+  withdrawn or superseded package verifies forever and keeps answering, and a form that can
+  only say *these bytes are intact* has no way to say *and they are still current*. What the
+  form owes is one declaration — where the answer lives — plus the reader's rules below. The
+  revocation *service* stays outside this standard, deliberately: a mechanism here would make
+  every consumer depend on an endpoint the format cannot guarantee.
+
+  **The document a status source serves** — three fields, and no more, because anything larger
+  would be the mechanism rather than the declaration:
+
+  ```jsonc
+  { "koine": "0",
+    "status": "current",                 // "current" | "superseded" | "withdrawn"
+    "since": "2026-09-17T00:00:00Z",     // OPTIONAL, ISO-8601 UTC
+    "supersededBy": "2026.10.0",         // OPTIONAL, for "superseded"
+    "note": "…" }                        // OPTIONAL, prose for a human
+  ```
+
+  **The reader's rules (normative).** A consumer that declares the `status-source` capability:
+  MUST render a package whose status source it **cannot reach** as *possibly-stale*, never as
+  current — rendering an unreachable source as current asserts exactly what it failed to
+  check; MUST treat `withdrawn` as **removing the package from its answer context**, not only
+  from a shelf, because a withdrawn package that still answers questions is the failure this
+  declaration exists to prevent; and MAY continue to serve a `superseded` package while
+  naming its successor. Serving the document, polling it, and caching it are the publisher's
+  and the consumer's business, not the format's.
 - `integrity` — the root hash, §7.4. `koine.json` itself is never covered by it and MUST
   NOT appear in the identity map: the manifest is the envelope, not a body — the seal
   (`provenance.signature`) is what vouches for the manifest.
 
-**What a validator MUST check.** A v0 validator MUST enforce `koine`, `name`, `version` and
-`integrity` — including path safety for every payload path it reads (§7.10). The remaining
-fields are carried through unvalidated in the reference implementation: a malformed `source`,
-`provenance`, `license`, `terms`, `representations` or `description` is preserved rather
-than rejected. A producer therefore cannot rely on a consumer to catch a wrong shape in those
+**What a validator MUST check.** A v0 validator MUST enforce `koine`, `name`, `version`,
+`integrity` and **`requires`** — including path safety for every payload path it reads
+(§7.10). `requires` joins the list because it is the one accompanying field whose whole
+purpose is to be honoured: carrying an unparseable `requires` through would defeat the
+mechanism at its first use. `status` is checked only for being an absolute `http(s)` URL — a
+malformed one is rejected rather than silently un-consulted. The remaining fields are carried
+through unvalidated in the reference implementation: a malformed `source`, `provenance`,
+`license`, `terms`, `representations` or `description` is preserved rather than rejected. A producer therefore cannot rely on a consumer to catch a wrong shape in those
 fields.
 
 **Representations *(OPEN)*.** `representations` is a free-form hint array (e.g. `"prose"`,
@@ -1158,6 +1216,66 @@ Three consequences worth stating, because each has already been gotten wrong onc
 - Everything a vendor wants *other* implementations to honour belongs in the core, proposed
   as a spec change — never in a profile. A profile is where a vendor keeps what is its own.
 
+### 8.1 Required capabilities — the must-understand half
+
+The `x-` surface above is **ignorable by construction**, and §7.5 makes carrying-without-
+understanding explicitly legal. That is the right rule for an optional facet and the wrong
+one for a mandatory one: a profile that cannot say *you must honour this or refuse me* is not
+an extension mechanism, it is a suggestion. This section is the other half.
+
+An artifact MAY declare **`requires`** — a list of **capability tokens** a consumer must
+implement to read it faithfully:
+
+```jsonc
+"requires": ["absent-body", "org.acme.retraction"]
+```
+
+- **Package grain:** the `requires` field of `koine.json` (§7.3).
+- **Tree grain:** `.koine/requires.json` — `{"koine": "0", "requires": [...]}`, tokens sorted.
+  The file exists only when something is required, so no tree that demands nothing changes.
+- **A core token** is lowercase and hyphenated and is registered in the table below. **A
+  vendor token** is reverse-DNS (`org.acme.thing`) and is never registered here — a profile's
+  key set grows on its owner's clock. The two namespaces cannot collide: a core token has no
+  dot, a vendor token has at least one.
+
+**The rule (normative).** A consumer reading an artifact that declares a capability it does
+not implement **MUST refuse the artifact** — not import it, not materialize it, not answer
+from it — and MUST say which capability it lacks. A consumer that logs a warning and
+continues has implemented the warning, not the rule. `requires` is also the one accompanying
+manifest field a validator MUST parse rather than carry through (§7.3): a `requires` a reader
+cannot parse is one it cannot honour.
+
+**The registered core capabilities.**
+
+| token | what implementing it means |
+|---|---|
+| `locator` | resolve an endpoint Locator (§3.4), and report a stale one rather than a region |
+| `absent-body` | read a node row marked `absent` (§3.2), and refuse to activate on a `required` one |
+| `status-source` | read a package's declared status source (§7.3), and render an unreachable one as possibly-stale |
+
+**Some facets are mandatory to declare when used; most are not.** The discriminator is what a
+reader that ignores the facet concludes. Ignore `state`, the commit `node` binding or the
+four-verdict result and a reader under-reads and knows it. Ignore `absent` and it concludes
+**it holds every body** — a confident wrong answer. So a tree carrying an `absent` row and
+not requiring `absent-body` is **malformed**: an emitter MUST refuse to write it and a parser
+MUST refuse to read it. `locator` and `status-source` are a producer's choice, because
+ignoring a Locator widens *supports page 14* into *supports the document* — a loss of
+precision, not a false statement.
+
+**The moment to add this mechanism was before a second profile existed.** Every interchange
+format that survived multi-party use grew one — JWT/COSE `crit`, OCI `artifactType`, JSON-LD
+`@protected` — and each grew it late, when every existing profile had already become a
+compatibility constraint on it. The model here is `crit`'s: a flat list of fine-grained
+tokens, so a reader refuses precisely instead of refusing a whole profile it mostly
+implements.
+
+**This is also how richer semantics stay out of the core without closing the door.** A full
+ontology, an inference profile, a domain's own status axes — all possible, none core. They
+enter as a profile that declares itself required, and a reader that does not implement it
+refuses honestly instead of importing and guessing. **The core carries anything and
+understands exactly one thing: what the things are and how they relate.** A second understood
+thing is where adoption stops.
+
 ## 9. *[Reserved]* The verbs
 
 This chapter is reserved and deliberately empty. Its subject is the travel form of the
@@ -1292,6 +1410,40 @@ contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and 
 ---
 
 ## Changelog
+
+### 2026-09-17 — the verdict: must-understand, and a package's honesty about itself
+
+**koine's only extension shape was ignorable by construction.** §7.5 makes carrying-without-
+understanding explicitly legal — the right rule for an optional facet, the wrong one for a
+publication or retraction rule a receiver must honour or refuse. There was no `requires`, no
+crit-list, no artifact-type discriminator, so a profile could only suggest.
+
+- **New §8.1, required capabilities.** An artifact declares `requires` — a flat list of
+  capability tokens, `crit`'s model — at package grain (`koine.json`) or tree grain
+  (`.koine/requires.json`). A consumer that does not implement one **MUST refuse the
+  artifact and name what it lacks**. Three core tokens are registered: `locator`,
+  `absent-body`, `status-source`. `requires` becomes the one accompanying manifest field a
+  validator MUST parse rather than carry through — a rule a reader cannot parse is one it
+  cannot honour. The `x-` surface is untouched and stays the optional half; the two mechanisms
+  never collapse.
+- **A package can say what it LACKS.** `nodes.jsonl` gains **`absent`** (§3.2): this body is
+  referenced and not carried, optionally with a reason, optionally `required` — and the row
+  keeps the absent body's digest, which is what makes it a declaration rather than a note.
+  Previously a package could reference a body it did not carry only by leaving it out, which
+  is indistinguishable from not referencing it at all. **A tree using it MUST require
+  `absent-body`**: emit refuses to write one that does not, and parse refuses to read it,
+  because a reader ignoring the key concludes it holds everything. Verification asks the
+  opposite question — the tree must NOT carry what it declares absent.
+- **A package can say where its own STANDING is published.** `koine.json` gains **`status`**
+  (§7.3), an absolute URL, with a three-field document and the reader's rules: an unreachable
+  source renders as *possibly-stale*, never current; `withdrawn` removes the package from the
+  consumer's answer context, not only from its shelf. *Offline verifiability of an old package
+  does not prove it may still be used today.* The revocation **service** stays outside the
+  standard — the form owes a declaration, never a mechanism.
+
+Both declarations were deliberately written after §8.1 rather than beside it: carried as
+ignorable `x-` extensions they would have been exactly the unsafe shape that section exists to
+close.
 
 ### 2026-09-17 — the roundtrip, and the Locator
 

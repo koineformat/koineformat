@@ -12,6 +12,7 @@
 
 import { sha256Hex } from './sha256.js'
 import { resolveLocator } from './locator.js'
+import { REQUIRES_PATH, emitRequiresJson, parseRequiresJson, requiresProblem } from './capabilities.js'
 import { isShapeProblem, readShapeBlock } from './shape.js'
 import { coerceShapeValues, validateAgainstSchema } from './schema.js'
 import {
@@ -48,12 +49,13 @@ import {
   type KoineRecordType,
   type KoineTagType,
   type KoineTreeInput,
-  type KoineTreeNodeInput,
+  type KoineNodeInput,
   type KoineTypeSet,
   type KoineValidity,
   type KoineVerdict,
   type KoineVerifyResult,
   type ParsedKoineTree,
+  isAbsentNodeInput,
 } from './types.js'
 
 export const KOINE_DIR = '.koine'
@@ -109,7 +111,8 @@ const travelsInFrozenSlice = (state: KoineValidity | undefined): boolean =>
  * A promotion that never reached the body is exactly the defect §4 rule 1
  * exists to make visible, and choosing a winner here would bury it.
  */
-function resolveState(node: KoineTreeNodeInput): KoineValidity | undefined {
+function resolveState(node: KoineNodeInput): KoineValidity | undefined {
+  if (isAbsentNodeInput(node)) return node.state
   const text = textIfText(node.bytes)
   const block = text === undefined ? undefined : readShapeBlock(text)
   if (block === undefined || isShapeProblem(block)) return node.state
@@ -178,10 +181,26 @@ export async function emitKoineTree(
   const files = new Map<string, Uint8Array | string>()
 
   const entries: KoineNodeEntry[] = []
+  let declaresAbsence = false
   for (const node of nodes) {
+    const state = states.get(node.id)
+    if (isAbsentNodeInput(node)) {
+      // A declared absence: nothing is written at its path — the whole point is
+      // that the body is NOT here — and the digest is the producer's, so a
+      // receiver that obtains the body elsewhere can check that it is the one.
+      declaresAbsence = true
+      entries.push({
+        id: node.id,
+        path: node.path,
+        format: node.format,
+        contentHash: node.contentHash,
+        ...(state !== undefined ? { state } : {}),
+        absent: node.absent,
+      })
+      continue
+    }
     files.set(node.path, node.bytes)
     const hash = await sha256Hex(toBytes(node.bytes))
-    const state = states.get(node.id)
     entries.push({
       id: node.id,
       path: node.path,
@@ -191,6 +210,23 @@ export async function emitKoineTree(
     })
   }
   files.set(NODES_PATH, emitNodesJsonl(entries))
+
+  // The must-understand rule at emit (§8.1). `absent-body` is mandatory to
+  // declare when used: a reader that ignored the key would conclude it holds
+  // every body — a confident WRONG answer, not an incomplete one. Declaring it
+  // is what turns the ignorable extension surface into a refusable one.
+  const requires = input.requires ?? []
+  const requiresProblemText = requiresProblem([...requires])
+  if (requiresProblemText !== undefined) throw new KoineEmitError(requiresProblemText)
+  if (declaresAbsence && !requires.includes('absent-body')) {
+    throw new KoineEmitError(
+      'this tree declares an absent body and does not require the "absent-body" capability — '
+      + 'a reader that ignores the declaration concludes it holds everything (SPEC §8.1)',
+    )
+  }
+  if (requires.length > 0) {
+    files.set(REQUIRES_PATH, emitRequiresJson({ koine: '0', requires: [...requires] }))
+  }
 
   if (input.edges !== undefined) files.set(EDGES_PATH, emitEdgesJsonl(edges))
 
@@ -327,14 +363,31 @@ export function parseKoineTree(files: ReadonlyMap<string, Uint8Array | string>):
     }
   }
 
+  const requiresText = files.get(REQUIRES_PATH)
+  const requires = requiresText === undefined ? [] : parseRequiresJson(textOf(requiresText)).requires
+
+  const nodes = parseNodesJsonl(textOf(nodesText))
+  // An artifact that uses a mandatory-to-declare facet without declaring it is
+  // MALFORMED, not merely suspect — so this is a parse error rather than a
+  // verdict. A reader handed such a tree cannot be told to be careful; there is
+  // nothing in the bytes that would make it careful.
+  if (nodes.some((n) => n.absent !== undefined) && !requires.includes('absent-body')) {
+    throw new KoineParseError(
+      REQUIRES_PATH,
+      0,
+      'this tree declares an absent body and does not require the "absent-body" capability (SPEC §8.1)',
+    )
+  }
+
   return {
-    nodes: parseNodesJsonl(textOf(nodesText)),
+    nodes,
     edges: files.has(EDGES_PATH) ? parseEdgesJsonl(textOf(files.get(EDGES_PATH) as Uint8Array | string)) : [],
     commits: commitsText === undefined ? [] : parseCommitsJsonl(textOf(commitsText)),
     chain: chainText === undefined ? undefined : parseChainJsonl(textOf(chainText)),
     types,
     dictionaries: readDictionaries(types),
     bodies,
+    requires,
   }
 }
 
@@ -424,6 +477,17 @@ export async function verifyKoineTree(files: ReadonlyMap<string, Uint8Array | st
   const hashByPath = new Map<string, KoineContentHash>()
   for (const node of tree.nodes) {
     const body = files.get(node.path)
+    if (node.absent !== undefined) {
+      // A declared absence is checked in the OTHER direction: the tree must not
+      // carry the body it says it does not carry. A row claiming absence over a
+      // present file is a package lying about itself in the safest-looking way.
+      if (body !== undefined) {
+        integrity.push(
+          `node ${node.id} (${node.path}) is declared absent and the tree carries it — one of the two is false`,
+        )
+      }
+      continue
+    }
     if (body === undefined) {
       integrity.push(`node ${node.id}: path "${node.path}" is missing from the tree`)
       continue
@@ -454,6 +518,18 @@ export async function verifyKoineTree(files: ReadonlyMap<string, Uint8Array | st
     ] as const) {
       if (locator === undefined) continue
       const node = byId.get(id) as KoineNodeEntry
+      if (node.absent !== undefined) {
+        // The body is not here, and the row still declares its digest — so the
+        // one question that CAN be asked still is: does this pointer address the
+        // version this tree says is missing, or a different one?
+        if (locator.contentHash !== node.contentHash) {
+          references.push(
+            `edge ${edge.from} -> ${edge.to}: its ${end} Locator addresses ${locator.contentHash}, and the absent `
+            + `node "${id}" is declared as ${node.contentHash}`,
+          )
+        }
+        continue
+      }
       const body = files.get(node.path)
       if (body === undefined) continue // already reported by integrity
       const resolution = resolveLocator(locator, body, hashByPath.get(node.path) as KoineContentHash)

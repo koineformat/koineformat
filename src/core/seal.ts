@@ -118,6 +118,8 @@ export async function sealPackage(
     description,
     license,
     readingFloor,
+    requires,
+    status,
     source: src,
     representations,
     provenance,
@@ -132,6 +134,8 @@ export async function sealPackage(
     ...(description !== undefined ? { description } : {}),
     ...(license !== undefined ? { license } : {}),
     ...(readingFloor !== undefined ? { readingFloor } : {}),
+    ...(requires !== undefined ? { requires } : {}),
+    ...(status !== undefined ? { status } : {}),
     ...(src !== undefined ? { source: src } : {}),
     ...(representations !== undefined ? { representations } : {}),
     provenance: {
