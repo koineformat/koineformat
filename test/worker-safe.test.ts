@@ -120,6 +120,7 @@ describe('worker-safe by construction', () => {
       'src/locator.ts',
       'src/proposal.ts',
       'src/schema.ts',
+      'src/seal.ts',
       'src/sha256.ts',
       'src/shape.ts',
       'src/sidecars.ts',

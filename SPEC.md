@@ -606,16 +606,70 @@ The seal travels as a detached JSON sidecar (`<file>.seal.json` beside a standal
 - **The scheme:** BIP-340 Schnorr over secp256k1; public keys npub-encoded — existing
   ecosystem tooling encodes, decodes and verifies them.
 
-The byte-exact payload enumeration and its conformance vectors are a declared gap
-([Declared gaps](#declared-gaps)): they are extracted from the reference implementation's
-test vectors, not authored ahead of them.
+**The payload — enumerated.** `payloadType` is `application/vnd.koine.seal+json`, and the
+payload is a JSON object with these fields, **all of them inside the signature**:
+
+```jsonc
+{ "koine": "0",
+  "kind": "koine/seal@v0",
+  "method": "bip340",              // inside: DSSE carries no algorithm field
+  "pubkey": "<64 lowercase hex>",  // inside: DSSE's keyid is an unauthenticated hint
+  "npub": "npub1…",                // the same key, NIP-19, for existing tooling
+  "author": "actor:user:<id>",     // or actor:agent:<id>
+  "signedAt": "2026-09-17T12:00:00Z",
+  "subject": { … one of the three grains below … },
+  "delegation": { … a nested DSSE envelope, iff the author is an agent (§6.7) … } }
+```
+
+**The subject, at the three grains of §6.3:**
+
+| grain | shape |
+|---|---|
+| chain head | `{"grain":"chain-head","hash":"<64 hex>"}` |
+| a single file | `{"grain":"file","nodeId":…,"path":…,"contentHash":"sha256:<hex>"}` |
+| a package | `{"grain":"package","name":…,"version":…,"integrity":"sha256:<hex>"}` |
+
+**The signed message is `sha256(PAE(payloadType, payload))`** — 32 bytes. BIP-340 accepts an
+arbitrary-length message; this profile fixes the digest so every implementation hashes the
+same way and the primitive is exactly the one a delegation certificate uses. `PAE` is DSSE
+1.0.2's: `"DSSEv1" SP LEN(type) SP type SP LEN(body) SP body`, with `LEN` the ASCII-decimal
+**byte** length and `SP` one 0x20. Length-prefixing is what makes it unambiguous — without
+it the same bytes could be re-split at a different boundary.
+
+**There is no canonicalization rule in this chapter, and that is deliberate.** DSSE
+authenticates the payload as **raw bytes**: the envelope carries them verbatim (base64) and a
+verifier authenticates exactly those bytes before parsing them. So two implementations agree
+on what was signed by construction — no sorted-key discipline, no RFC 8785, no JSON
+canonicalization to get subtly wrong. The delegation certificate is a DSSE envelope for the
+same reason: bytes all the way down.
+
+**Conformance vectors** ship with the reference implementation
+(`test/vectors/seal-v0.json`): each case names the envelope bytes, the subject a verifier
+must recompute from content, and the expected verdict. An implementation is conformant when
+it reproduces every verdict. **Declared gap 2 closes with this revision** — and the reason it
+stayed open is worth recording, because the plan for closing it could not have worked: the
+gap said the enumeration would be *extracted from the reference implementation's test
+vectors*, and the reference implementation had a live BIP-340 path that signed a **different
+envelope** — `sha256(canonicalJson(subject))`, with `method` and `pubkey` sitting outside the
+signed bytes. There was nothing to extract that matched this chapter, so the chapter was
+waiting on an extraction that could never arrive.
 
 ### 6.5 Verification — offline, four steps, no registry
 
 A verifier consults nothing but the shipped bytes and public keys: (1) recompute the subject
-digest from content; (2) decode the author's public key; (3) verify the signature over the
-PAE bytes; (4) for an agent author, verify the **delegation certificate** (§6.7). ~50 lines
-in any language.
+**from content** and compare it against the payload's; (2) decode the author's public key;
+(3) verify the signature over the PAE bytes; (4) for an agent author, verify the
+**delegation certificate** (§6.7). ~50 lines in any language.
+
+**Step 1 recomputes; it never reads the subject off the seal.** A verifier that took the
+subject from the envelope would be checking the seal against itself, and every one of the
+three grains would then vouch for nothing.
+
+**What a failure names.** A verdict that is merely `false` cannot be acted on, so a
+conformant verifier reports which step refused: `wrong-payload-type` · `wrong-method` ·
+`malformed` · `subject-mismatch` · `bad-signature` · `delegation-key-mismatch` ·
+`delegation-actor-mismatch` · `bad-delegation`. The same reasoning as §3.5's four verdicts,
+at a finer grain.
 
 ### 6.6 Identity without a registry — the four anchors
 
@@ -638,6 +692,28 @@ For agent-authored work the seal carries the chain of mandate **in the artifact*
 responsible human's key signs a claim binding the agent's public key to theirs, so
 `actor:agent:<id>` becomes a verifiable chain instead of a string — the receiver verifies the
 mandate offline, whoever the parties turn out to be.
+
+The certificate is itself a DSSE envelope, `payloadType`
+`application/vnd.koine.delegation+json`, carried in the seal payload's `delegation` field:
+
+```jsonc
+{ "koine": "0",
+  "kind": "koine/delegation@v0",
+  "method": "bip340",
+  "agent": "actor:agent:<id>",
+  "agentPubkey": "<64 lowercase hex>",
+  "by": "actor:user:<id>",
+  "byPubkey": "<64 lowercase hex>",
+  "byNpub": "npub1…",
+  "issuedAt": "2026-09-01T00:00:00Z" }
+```
+
+signed by the **human's** key over its own PAE, exactly as a seal is.
+
+**Two bindings, and both are required.** A verifier MUST check that `agentPubkey` is the key
+that signed **this** seal, and that `agent` is the author **this** seal claims. Without the
+first, a valid certificate minted for another agent can be pasted onto this envelope; without
+the second, an agent's certificate vouches for a seal claiming a different author.
 
 This is the one part of the chapter with no prior art to compose: DSSE and WACZ carry no
 delegation concept, and C2PA's trust model is X.509-only — structurally closed to
@@ -1421,10 +1497,15 @@ contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and 
    so older references keep resolving. What remains open beside it, and is NOT this gap: how
    a selector is expected to degrade for a format this document has not measured — a new
    format's row in §3.4's table is written when a producer round-trips one.
-2. **Seal payload enumeration + conformance vectors.** Chapter 6's profile fixes the
-   contract (DSSE PAE; method and key inside the payload; delegation certificate); the
-   byte-exact payload field list and its fixtures are extracted from the reference
-   implementation's test vectors, not authored ahead of them.
+2. **Seal payload enumeration + conformance vectors — CLOSED 2026-09-17.** §6.4 enumerates
+   the payload, §6.7 the delegation certificate, and `test/vectors/seal-v0.json` carries the
+   conformance cases. The number stays so older references keep resolving. **Why the original
+   plan could not have worked**, recorded because the shape recurs: the gap said the
+   enumeration would be *extracted from the reference implementation's test vectors*, and that
+   implementation signed a **different envelope** from the one this chapter declares — so
+   there was nothing to extract, and the gap was waiting on an event that could not occur.
+   A gap whose closing condition is an extraction should name the artifact it will extract
+   FROM, and check that it exists.
 3. **The format dictionary.** The fourth dictionary has no sidecar file kind; a body's
    format travels as a field of its identity-map row (§3.2). What a format declaration
    would consist of is open.
@@ -1446,6 +1527,42 @@ contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and 
 ---
 
 ## Changelog
+
+### 2026-09-17 — the seal: chapter 6 closes, and the gap's own plan is corrected
+
+**Declared gap 2 closes.** §6.4 enumerates the seal payload, §6.7 enumerates the delegation
+certificate, and conformance vectors ship with the reference implementation.
+
+The gap's closing condition was *"extracted from the reference implementation's test vectors,
+not authored ahead of them"* — and **the extraction could never have happened.** The
+reference implementation had a live, coherent BIP-340 signing path that implemented a
+different envelope from this chapter: `sha256(canonicalJson(subject))`, with `method` and
+`pubkey` outside the signed bytes. §6.4 asks for DSSE and for both facts inside the
+authenticated payload, and gives the reason — DSSE's `keyid` is an unauthenticated hint that
+MUST NOT be used for security decisions, and DSSE carries no algorithm field at all. So there
+was nothing to extract that matched, and every month spent waiting was a month three
+unrelated roads stayed blocked behind this chapter. **A gap whose closing condition is an
+extraction should name the artifact it will extract FROM, and check that it exists.**
+
+- **§6.4** enumerates the payload: `koine` · `kind` · `method` · `pubkey` · `npub` · `author`
+  · `signedAt` · `subject` · optional `delegation`, all inside the signature. The subject has
+  the three grains of §6.3. The signed message is `sha256(PAE(payloadType, payload))`, 32
+  bytes, with `PAE` exactly DSSE 1.0.2's.
+- **There is no canonicalization rule, deliberately.** DSSE authenticates the payload as raw
+  bytes, so two implementations agree on what was signed by construction — no sorted-key
+  discipline, no RFC 8785, nothing to get subtly and silently wrong. The delegation
+  certificate is a DSSE envelope for the same reason: bytes all the way down.
+- **§6.5** says what §3.5 says at a finer grain: a verdict that is merely `false` cannot be
+  acted on, so a refusal names its step. And step 1 **recomputes** the subject from content —
+  a verifier that read it off the seal would be checking the seal against itself.
+- **§6.7** enumerates the certificate and states the two bindings a verifier MUST check: the
+  certificate's key is the key that signed THIS seal, and its agent is the author THIS seal
+  claims. Without the first, a certificate minted for another agent can be pasted on.
+
+**The curve is not this package's.** Everything the FORM owns is implemented here — the
+pre-authentication encoding, the payload enumeration, the subject binding, the delegation
+chain — and the curve operation is injected, so the package keeps its zero-dependency
+property and §6.5's *"~50 lines in any language"* stays a description rather than a slogan.
 
 ### 2026-09-17 — the receiver: the day-one gesture gets an implementation
 
