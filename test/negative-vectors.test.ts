@@ -316,3 +316,51 @@ describe('round 4 — the repairs of the repairs, and one the review did not rep
     expect(calls).toBe(0)
   })
 })
+
+describe('the self-audit — found by running the reported shapes as queries, not by a report', () => {
+  it('ONE actor grammar, at all three grains', async () => {
+    const { isKoineActor } = await import('../src/types.js')
+    const { parseCommitsJsonl } = await import('../src/sidecars.js')
+    const { validateProposalEnvelope } = await import('../src/proposal.js')
+
+    // It was written three times with three strictnesses: the seal required a
+    // non-empty id, the proposal tested the prefix only, and commits.jsonl did
+    // not check at all — while §3.3 declares the grammar normative for exactly
+    // that field. So `actor:user:` was a valid proposer and an invalid seal
+    // author, and `"bob"` was a valid commit actor and invalid everywhere else.
+    for (const bad of ['bob', 'actor:user:', 'actor:robot:x', '']) {
+      expect([bad, isKoineActor(bad)]).toEqual([bad, false])
+      const line = `${JSON.stringify({ seq: 1, actor: bad, what: 'w', why: 'y', when: '2026-01-01T00:00:00Z' })}\n`
+      expect(() => parseCommitsJsonl(line)).toThrow()
+      expect(validateProposalEnvelope({ proposer: bad }).some(p => p.includes('proposer'))).toBe(true)
+    }
+    expect(isKoineActor('actor:user:ada')).toBe(true)
+    expect(isKoineActor('actor:user:ada', 'agent')).toBe(false)
+  })
+
+  it('ONE state law, for both emitters', async () => {
+    const { travellingState } = await import('../src/shape.js')
+    const declaring = '# x\n\n```shape\nkind: note\nstate: valid\n```\n'
+    // The body wins where it declares…
+    expect(travellingState(declaring, undefined).state).toBe('valid')
+    // …the asserted value answers where the body is silent…
+    expect(travellingState('# plain\n', 'draft').state).toBe('draft')
+    // …and a contradiction is returned, so each caller owes its own error.
+    expect(travellingState(declaring, 'draft').conflict)
+      .toEqual({ asserted: 'draft', declared: 'valid' })
+  })
+
+  it('the Locator DERIVES the body’s hash by default', async () => {
+    const { resolveLocator, resolveLocatorAgainst } = await import('../src/locator.js')
+    const body = 'alpha beta gamma\n'
+    const wrong = `sha256:${'0'.repeat(64)}` as const
+
+    // The default derives, so a stale pointer is reported as stale.
+    expect((await resolveLocator({ contentHash: wrong }, body)).status).toBe('stale')
+
+    // The hot-loop variant still trusts what it is handed — which is exactly why
+    // it is named rather than default. Handing it the locator's own hash makes
+    // every pointer resolve, always, and nothing says so.
+    expect(resolveLocatorAgainst({ contentHash: wrong }, body, wrong).status).toBe('resolved')
+  })
+})

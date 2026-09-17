@@ -21,6 +21,7 @@
  * would read *"supports page 14"* as *"supports the document"*.
  */
 
+import { sha256Hex } from './sha256.js'
 import type { KoineContentHash, KoineLocator, KoineSelector } from './types.js'
 import { KoineParseError } from './types.js'
 
@@ -36,6 +37,7 @@ export const SELECTOR_TYPES = [
 
 const SELECTOR_TYPE_SET: ReadonlySet<string> = new Set(SELECTOR_TYPES)
 
+const utf8 = new TextEncoder()
 const utf8Decoder = new TextDecoder()
 
 const textOf = (value: Uint8Array | string): string =>
@@ -202,11 +204,23 @@ export type LocatorResolution =
   | { readonly status: 'not-found'; readonly reason: string }
 
 /**
- * Resolve a Locator against a body whose content hash the caller already
- * computed. The hash is passed in rather than recomputed so a caller verifying
- * a whole tree hashes each body once.
+ * Resolve a Locator against a body whose content hash the caller ALREADY
+ * COMPUTED — the hot-loop variant, for a caller verifying a whole tree that
+ * hashes each body once.
+ *
+ * **Prefer {@link resolveLocator}, which derives the hash itself.** The `stale`
+ * answer — the one thing this shape exists to give, and the one no other anchor
+ * vocabulary can — is only worth anything if `actualHash` really is the hash of
+ * `body`. A caller that passes `locator.contentHash` here gets `resolved` for
+ * every pointer, always, and nothing says so: the same shape that let a genuine
+ * seal over one package admit another, one layer down.
+ *
+ * Found by running that shape as a query over the whole source rather than by
+ * being reported. Kept, because the whole-tree verifier genuinely needs it and
+ * hashing per Locator would be quadratic; renamed, so reaching for it is a
+ * decision rather than the default.
  */
-export function resolveLocator(
+export function resolveLocatorAgainst(
   locator: KoineLocator,
   body: Uint8Array | string,
   actualHash: KoineContentHash,
@@ -328,4 +342,19 @@ function resolvePointer(pointer: string, text: string): LocatorResolution {
     }
   }
   return { status: 'resolved', region: { kind: 'value', value: cursor } }
+}
+
+/**
+ * Resolve a Locator against a body, DERIVING the body's hash rather than being
+ * told it — the one to reach for.
+ *
+ * Async because the hash is: WebCrypto's digest is the only hashing this package
+ * does, and a synchronous answer would have to be handed a claim.
+ */
+export async function resolveLocator(
+  locator: KoineLocator,
+  body: Uint8Array | string,
+): Promise<LocatorResolution> {
+  const actual: KoineContentHash = `sha256:${await sha256Hex(typeof body === 'string' ? utf8.encode(body) : body)}`
+  return resolveLocatorAgainst(locator, body, actual)
 }

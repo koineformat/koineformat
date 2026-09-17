@@ -21,7 +21,7 @@ import { assertSafeRelPath } from "./paths.js";
 import { errBadManifest } from "./errors.js";
 import { sha256Hex } from "../sha256.js";
 import { emitNodesJsonl, parseNodesJsonl } from "../sidecars.js";
-import { isShapeProblem, readShapeBlock } from "../shape.js";
+import { travellingState } from "../shape.js";
 import type { KoineNodeEntry, KoineValidity } from "../types.js";
 
 /** Where the identity map lives inside a package (SPEC §3.2 · §7.2). */
@@ -70,21 +70,15 @@ function resolveSealedState(
   bytes: Uint8Array,
   prior: KoineValidity | undefined,
 ): KoineValidity | undefined {
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return prior; // a binary body carries no shape block
-  }
-  const block = readShapeBlock(text);
-  if (block === undefined || isShapeProblem(block) || block.state === undefined) return prior;
-  if (prior !== undefined && prior !== block.state) {
+  const verdict = travellingState(bytes, prior);
+  if (verdict.conflict !== undefined) {
     throw errBadManifest(
-      `"${path}" is listed as "${prior}" in the identity map and declares "${block.state}" in its own `
-      + `shape block — promote the body, or stop asserting a state it does not carry (SPEC §4 rule 1)`,
+      `"${path}" is listed as "${verdict.conflict.asserted}" in the identity map and declares `
+      + `"${verdict.conflict.declared}" in its own shape block — promote the body, or stop asserting `
+      + "a state it does not carry (SPEC §4 rule 1)",
     );
   }
-  return block.state;
+  return verdict.state;
 }
 
 /** True for the payload files the identity map lists — bodies, never sidecars. */

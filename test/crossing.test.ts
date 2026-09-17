@@ -296,7 +296,7 @@ describe('the Locator — an endpoint may address a PART, and says which version
     const was = await hash('alpha beta gamma\n')
     const now = await hash('alpha BETA gamma\n')
     expect(
-      resolveLocator({ contentHash: was, selector: { type: 'text-quote', exact: 'beta' } }, 'alpha BETA gamma\n', now),
+      await resolveLocator({ contentHash: was, selector: { type: 'text-quote', exact: 'beta' } }, 'alpha BETA gamma\n'),
     ).toEqual({ status: 'stale', expected: was, actual: now })
   })
 
@@ -304,36 +304,35 @@ describe('the Locator — an endpoint may address a PART, and says which version
     const text = 'one\ntwo\nthree\n'
     const h = await hash(text)
     const at = (selector: Parameters<typeof resolveLocator>[0]['selector']) =>
-      resolveLocator({ contentHash: h, selector }, text, h)
+      resolveLocator({ contentHash: h, selector }, text)
 
-    expect(at({ type: 'text-quote', exact: 'two' })).toMatchObject({ status: 'resolved' })
-    expect(at({ type: 'text-position', start: 4, end: 7 })).toMatchObject({
+    expect(await at({ type: 'text-quote', exact: 'two' })).toMatchObject({ status: 'resolved' })
+    expect(await at({ type: 'text-position', start: 4, end: 7 })).toMatchObject({
       status: 'resolved',
       region: { text: 'two' },
     })
-    expect(at({ type: 'line-range', start: 2 })).toMatchObject({ status: 'resolved', region: { text: 'two' } })
-    expect(at({ type: 'line-range', start: 2, end: 3 })).toMatchObject({ region: { text: 'two\nthree' } })
-    expect(at({ type: 'page', number: 3 })).toMatchObject({ status: 'opaque' })
-    expect(at({ type: 'time-range', start: 12.5 })).toMatchObject({ status: 'opaque' })
+    expect(await at({ type: 'line-range', start: 2 })).toMatchObject({ status: 'resolved', region: { text: 'two' } })
+    expect(await at({ type: 'line-range', start: 2, end: 3 })).toMatchObject({ region: { text: 'two\nthree' } })
+    expect(await at({ type: 'page', number: 3 })).toMatchObject({ status: 'opaque' })
+    expect(await at({ type: 'time-range', start: 12.5 })).toMatchObject({ status: 'opaque' })
 
     const json = '{"rows":[{"amount":7}]}'
     const jh = await hash(json)
     expect(
-      resolveLocator({ contentHash: jh, selector: { type: 'json-pointer', pointer: '/rows/0/amount' } }, json, jh),
+      await resolveLocator({ contentHash: jh, selector: { type: 'json-pointer', pointer: '/rows/0/amount' } }, json),
     ).toEqual({ status: 'resolved', region: { kind: 'value', value: 7 } })
   })
 
   it('will not disambiguate a quote it cannot disambiguate', async () => {
     const text = 'beta and beta\n'
     const h = await hash(text)
-    expect(resolveLocator({ contentHash: h, selector: { type: 'text-quote', exact: 'beta' } }, text, h)).toMatchObject({
+    expect(await resolveLocator({ contentHash: h, selector: { type: 'text-quote', exact: 'beta' } }, text)).toMatchObject({
       status: 'not-found',
     })
     expect(
-      resolveLocator(
+      await resolveLocator(
         { contentHash: h, selector: { type: 'text-quote', exact: 'beta', prefix: 'and ' } },
         text,
-        h,
       ),
     ).toMatchObject({ status: 'resolved', region: { start: 9 } })
   })

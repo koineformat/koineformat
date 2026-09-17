@@ -330,6 +330,19 @@ read (§7.11).
   Before this binding existed the only place to express it was `what`, where no foreign
   reader can tell an id from a sentence — and where a frozen slice then carried it past the
   gate.
+
+  **`actor:(user|agent):<id>` is ONE grammar, and every field naming an actor is validated
+  against it.** This document has three such fields — `actor` here, a proposal's `proposer`
+  (chapter 5) and a seal's `author` together with its certificate's `delegatedTo` (chapter 6)
+  — and they are the same grammar, not three similar ones. `<id>` is non-empty, the role is
+  exactly `user` or `agent`, and nothing else parses. A reader MUST refuse a malformed actor
+  wherever it appears, and the refusal names the field it refused.
+
+  Stated normatively because it was implemented three times at three strictnesses, and a
+  grammar with three readers is not a grammar. Measured against the reference codec on
+  2026-09-17: `actor:user:` — a role with no identity behind it — was a valid proposer and an
+  invalid seal author, and `bob` was a valid commit actor and invalid everywhere else. Neither
+  split was a decision anybody made; both were the gap between one rule and its copies.
 - **`chain.jsonl`** — the Merkle chain. Line 1 is a header declaring `format` and `algo`.
   Then one link per commit: `{"seq", "commit", "prev", "hash"}`.
 
@@ -408,6 +421,17 @@ An emitter MUST refuse a Locator whose `contentHash` does not match the body its
 names: a pointer that is broken at the moment it is written should not be discovered by
 whoever tries to follow it.
 
+**A resolver DERIVES the version it resolves against.** It is handed the Locator and the body
+and computes that body's digest itself. An entry point that also ACCEPTS the actual hash can
+be handed the Locator's own — and then every pointer resolves, always, and nothing in the
+result says so. `stale` is the entire yield of the required `contentHash`, and a
+caller-supplied digest is the one input that can put it out of reach; this is §7.15's shape (a
+verifier told what it is checking) standing in chapter 3.
+
+A caller resolving many Locators against one body may hash that body once and reuse the digest.
+That variant is legitimate and MUST be a **separately named** entry point rather than the
+default one, so that reuse is something a reader of the call site can see.
+
 ### 3.5 Verification — four questions, four answers
 
 A verifier reports **four verdicts**, separately. Each is `pass`, `fail`, or
@@ -443,6 +467,19 @@ whether a body may be republished. **A state enforced only where the emitter sto
 law — it is a call parameter**, and this specification carried exactly that defect through
 its first year: the gradient was stated here, applied at emit, and written into no field, so
 a tree could be parsed and re-emitted and arrive with its gradient gone.
+
+**One resolution, and every emitter calls it.** A body's state can be stated in two places:
+the shape block inside the body, and the value an emitter is handed — a producer's parameter,
+or the identity-map row of a tree being re-emitted. **The body's declaration wins**; the handed
+value answers only where the body declares nothing; and a body declaring a state different from
+the one asserted for it is a REFUSAL at every boundary, never a silent pick between two
+readings.
+
+The rule is one rule. Two boundaries carry it — §1.4's tree emission and §7.4's sealing — and
+the second was written second, as the repair for *the seal drops the state*: a copy of the law
+placed beside the original. That is how a law acquires a hole, because copies stay equal only
+until somebody edits one. An implementation resolves the state in ONE function and both
+boundaries call it; what differs between them is the error each raises, not the reading.
 
 Five rules:
 
@@ -1650,6 +1687,42 @@ and for a year it did not.
 ---
 
 ## Changelog
+
+### 2026-09-17 (the query pass) — three defects nobody reported
+
+**Not a review round. This one is ours.** Four rounds of outside review had produced fifteen
+findings, and the fourth round's own lesson was that *a reported defect is a shape, not a site*.
+The honest reading of that lesson is uncomfortable: the shapes had been run as queries **only
+over the code the report pointed at**. Before asking anyone to read a fifth version, the two
+standing shapes were run over the whole source — *where is something checked against a value its
+own caller supplied* (rule 3) and *where does one rule have more than one enforcer* (rule 5).
+They found three, none of them reported, two of them introduced by our own repairs.
+
+- **The Locator's resolver took the actual hash from its caller.** `resolveLocator(locator,
+  body, actualHash)` — publicly exported since 0.5.0. A caller passing `locator.contentHash`
+  gets `resolved` for every pointer, forever, and the result says nothing; `stale` is the entire
+  point of the required `contentHash` and this is the one input that can make it unreachable.
+  Identical in shape to the seal-of-A-vouches-for-B finding of the second round (B8), in a
+  chapter the reviewer had no reason to probe. §3.4 now requires derivation, and the reusing
+  variant is named `resolveLocatorAgainst` — **an API break against 0.8.0**, deliberately, so
+  that the reuse is legible at the call site rather than hidden in a third argument.
+- **The state law had acquired a second enforcer — in the repair that closed its first hole.**
+  The round-2 finding *the seal drops the state* was closed by teaching `sealPackage` to read the
+  shape block. `emitKoineTree` already did. Two copies, and they had already drifted in their
+  handling of a body that declares one state while the emitter is told another. §4 now states the
+  resolution once and both boundaries call one function.
+- **The actor grammar was written three times, at three strictnesses.** The seal required a
+  non-empty id, the proposal receiver tested the prefix only, and `commits.jsonl` did not check
+  at all — while §3.3 declared the grammar normative for exactly that field. Measured: the actor
+  `actor:user:` was a valid proposer and an invalid seal author; `bob` was a valid commit actor
+  and invalid everywhere else. One predicate now, used at all three grains.
+
+**What this changes about the relationship, which is the part worth recording.** A standard
+whose defects are all found by its readers has outsourced its verification to people who owe it
+nothing — and four rounds in a single day is a reviewer spending more hours on this document than
+its editors were spending on the repairs. The query pass costs a fraction of a review round and
+runs against the whole source rather than the reported site. It belongs before a release, not
+after a report.
 
 ### 2026-09-17 (fourth round) — the shape of a repair, and the query it should have triggered
 

@@ -42,6 +42,7 @@ import { sha256Bytes, sha256Hex } from './sha256.js'
 // ONE canonicalization for the whole package — a manifest digest and a `const`
 // comparison that disagree about what a JSON value IS are two bugs waiting.
 import { canonicalJson, deepEqual } from './schema.js'
+import { isKoineActor as isActor } from './types.js'
 import type { KoineContentHash } from './types.js'
 
 /** The DSSE `payloadType` of a koine seal. */
@@ -263,17 +264,6 @@ export interface SealVerdict {
   readonly reason?: SealFailure
   /** The authenticated payload — present only when `valid`. */
   readonly payload?: KoineSealPayload
-}
-
-/**
- * `actor:(user|agent):<id>` — the one actor grammar this standard uses, checked
- * rather than pattern-matched at each site. `role` narrows it when only one kind
- * of actor is admissible.
- */
-function isActor(value: unknown, role?: 'user' | 'agent'): boolean {
-  if (typeof value !== 'string') return false
-  const match = /^actor:(user|agent):(.+)$/.exec(value)
-  return match !== null && match[2] !== '' && (role === undefined || match[1] === role)
 }
 
 /**

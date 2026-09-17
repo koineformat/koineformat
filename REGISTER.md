@@ -49,6 +49,15 @@ keep resolving — and points here.
    found the reported instances **and one the reviewer could not have seen** — a seal's own
    subject comparison, reachable only from a foreign producer, which would have refused a valid
    seal from a second implementation. The query costs minutes; the alternative is another round.
+
+   **Sharpened 2026-09-17, by running it properly for the first time.** The queries had been run
+   over *the code the report pointed at*, which is barely a query at all. Run over the whole of
+   `src/` before the next release rather than after the next report, the same two questions found
+   **three more defects, none of them reported** — a public resolver taking the hash it was meant
+   to check from its caller, a second enforcer for the state law introduced by the repair that
+   closed the law's first hole, and one grammar written three times at three strictnesses. The
+   population of a query is the source, not the citation; and its moment is before a release, not
+   after a report.
 5. **A law with two enforcers is a law with a hole in it.** Seven of the nine defects found by
    outside review lived BETWEEN the pieces, not inside them — the travel law held in
    `emitKoineTree` and not in `sealPackage`, a capability could be named and never refused, a
@@ -227,6 +236,9 @@ question. The form owes a declaration; whether it owes the verb is what this ent
 | **KF-20260917-B14-absence-equalled-null** | 2026-09-17 — the round-3 canonicalization repair made `undefined` render as `"null"`, so a proposal adding a field as `null` read as changing nothing. Equality answers presence before it compares values |
 | **KF-20260917-B15-stop-rule-at-one-step** | 2026-09-17 — §7.15's stop-on-refusal was implemented at one step of five, and the single early return overwrote the first refusal. The steps are declared once and `notRun` is derived by subtraction |
 | **KF-20260917-B7-schema-id-substituted** | 2026-09-17 — the emitter accepted a foreign `$id` and the parser stripped it, so a re-emit substituted koine's. §2.1 now says the FILENAME binds and the author's `$id` travels |
+| **KF-20260917-Q1-locator-trusts-its-caller** | 2026-09-17 — **found here, reported by nobody.** `resolveLocator(locator, body, actualHash)` took the version it resolved against from its caller; handed `locator.contentHash` it answered `resolved` for every pointer forever, and `stale` — the whole yield of the required hash — became unreachable. §3.4 requires derivation; the reusing variant is `resolveLocatorAgainst`, named so the reuse is visible. An API break against 0.8.0, taken deliberately |
+| **KF-20260917-Q2-state-law-has-two-enforcers** | 2026-09-17 — **found here.** Closing B1 (*the seal drops the state*) taught `sealPackage` to read the shape block, which `emitKoineTree` already did: the repair for a law with one hole produced a law with two enforcers, and they had already drifted on a body whose declaration contradicts the asserted value. §4 states the resolution once; `travellingState` is the one function both boundaries call |
+| **KF-20260917-Q3-actor-grammar-three-times** | 2026-09-17 — **found here.** §3.3's grammar was implemented at three strictnesses: non-empty id in the seal, prefix-only in the proposal receiver, unchecked in `commits.jsonl`. Measured — `actor:user:` was a valid proposer and an invalid seal author, `bob` was a valid commit actor and invalid everywhere else. One `isKoineActor`, used at all three grains |
 
 ---
 
@@ -277,6 +289,20 @@ independent Python reader over a subset of the form, built for its own adapter p
 the same revision-bound JSON Pointers and reaching the same content as the published JavaScript
 codec. That is external evidence and it is theirs to characterize, not this register's.
 
-What does not exist: a periodic reader. The next conformance contributor is the next adopter,
-and asking one for their acceptance criteria is how this file gets its next entries — which is
-how the seven findings of 2026-09-17 arrived.
+**The query pass — the first finder this repository runs on itself.** Population: the whole of
+`src/`. Questions: *where is something checked against a value its own caller supplied* (rule 3)
+and *where does one rule have more than one enforcer* (rule 5) — the two shapes fifteen findings
+reduced to. Run once, on 2026-09-17, before the 0.9.0 release and after the fourth review round:
+**three defects, none reported, two of them introduced by our own repairs** (Q1 · Q2 · Q3 above).
+
+It is characterized honestly or it is worth nothing: it is **manual**, it is **not periodic**, it
+is run by the same editors who wrote the code, and every one of its questions came from somebody
+else's finding. It does not replace a reader. What it changes is the ratio — a review round cost
+its reviewer hours and returned findings whose repairs cost us minutes, and the queries those
+findings taught can be run against the whole source for a fraction of a round. **A standard whose
+defects are all found by its readers has outsourced its verification to people who owe it
+nothing.** The next round's job should be checking our work, not replacing it.
+
+What still does not exist: a periodic reader, and an independent one. The next conformance
+contributor is the next adopter, and asking one for their acceptance criteria is how this file
+gets its next entries — which is how the seven findings of 2026-09-17 arrived.

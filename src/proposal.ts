@@ -25,9 +25,10 @@
  *   and the day-one gesture could not meet.
  */
 
-import { resolveLocator } from './locator.js'
+import { resolveLocatorAgainst } from './locator.js'
 import { coerceShapeValues, deepEqual, validateAgainstSchema } from './schema.js'
 import { isShapeProblem, readShapeBlock } from './shape.js'
+import { isKoineActor } from './types.js'
 import type {
   KoineContentHash,
   KoineLocator,
@@ -123,7 +124,9 @@ export function validateProposalEnvelope(value: unknown): string[] {
     problems.push('"baseChainHead" must be 64 lowercase hex chars')
   }
   if (typeof value['schema'] !== 'string') problems.push('"schema" is required')
-  if (typeof value['proposer'] !== 'string' || !/^actor:(user|agent):/.test(value['proposer'])) {
+  // ONE grammar (`isKoineActor`). This tested the PREFIX only, so `actor:user:`
+  // — an actor with no id — was a valid proposer and an invalid seal author.
+  if (!isKoineActor(value['proposer'])) {
     problems.push('"proposer" must be actor:(user|agent):<id>')
   }
   if (typeof value['when'] !== 'string') problems.push('"when" is required (ISO-8601 UTC)')
@@ -316,7 +319,7 @@ function receiveBodyProposal(
     contentHash: p.target.baseContentHash,
     ...(p.target.selector !== undefined ? { selector: p.target.selector } : {}),
   }
-  const resolution = resolveLocator(locator, text, contentHash)
+  const resolution = resolveLocatorAgainst(locator, text, contentHash)
   if (resolution.status === 'stale') {
     return {
       status: 'stale',
@@ -567,7 +570,7 @@ export function acceptProposal(
       contentHash: proposal.target.baseContentHash,
       ...(proposal.target.selector !== undefined ? { selector: proposal.target.selector } : {}),
     }
-    const resolution = resolveLocator(locator, body, proposal.target.baseContentHash)
+    const resolution = resolveLocatorAgainst(locator, body, proposal.target.baseContentHash)
     if (resolution.status !== 'resolved' || resolution.region.kind !== 'text') {
       throw new Error('acceptProposal: the region no longer resolves — receive the proposal again')
     }

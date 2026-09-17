@@ -11,9 +11,9 @@
  */
 
 import { sha256Hex } from './sha256.js'
-import { resolveLocator } from './locator.js'
+import { resolveLocatorAgainst } from './locator.js'
 import { REQUIRES_PATH, emitRequiresJson, parseRequiresJson, requiresProblem } from './capabilities.js'
-import { isShapeProblem, readShapeBlock } from './shape.js'
+import { isShapeProblem, readShapeBlock, travellingState } from './shape.js'
 import { coerceShapeValues, validateAgainstSchema } from './schema.js'
 import {
   edgeTypePath,
@@ -112,18 +112,17 @@ const travelsInFrozenSlice = (state: KoineValidity | undefined): boolean =>
  * exists to make visible, and choosing a winner here would bury it.
  */
 function resolveState(node: KoineNodeInput): KoineValidity | undefined {
-  if (isAbsentNodeInput(node)) return node.state
-  const text = textIfText(node.bytes)
-  const block = text === undefined ? undefined : readShapeBlock(text)
-  if (block === undefined || isShapeProblem(block)) return node.state
-  if (block.state === undefined) return node.state
-  if (node.state !== undefined && node.state !== block.state) {
+  const bytes = isAbsentNodeInput(node) ? undefined : node.bytes
+  if (bytes === undefined) return node.state
+  const verdict = travellingState(bytes, node.state)
+  if (verdict.conflict !== undefined) {
     throw new KoineEmitError(
-      `node "${node.id}" (${node.path}) is declared "${node.state}" by its producer and "${block.state}" by its own `
-      + 'shape block — promote the body, or stop asserting a state it does not carry (SPEC §4 rule 1)',
+      `node "${node.id}" (${node.path}) is declared "${verdict.conflict.asserted}" by its producer and `
+      + `"${verdict.conflict.declared}" by its own shape block — promote the body, or stop asserting a `
+      + 'state it does not carry (SPEC §4 rule 1)',
     )
   }
-  return block.state
+  return verdict.state
 }
 
 export async function emitKoineTree(
@@ -532,7 +531,8 @@ export async function verifyKoineTree(files: ReadonlyMap<string, Uint8Array | st
       }
       const body = files.get(node.path)
       if (body === undefined) continue // already reported by integrity
-      const resolution = resolveLocator(locator, body, hashByPath.get(node.path) as KoineContentHash)
+      // The hot-loop variant BY NAME: this loop hashed every body once, above.
+      const resolution = resolveLocatorAgainst(locator, body, hashByPath.get(node.path) as KoineContentHash)
       if (resolution.status === 'stale') {
         references.push(
           `edge ${edge.from} -> ${edge.to}: its ${end} Locator was taken against ${resolution.expected}, `

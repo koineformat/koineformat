@@ -15,6 +15,7 @@
 import { sha256Hex } from './sha256.js'
 import { canonicalLocator, parseLocator } from './locator.js'
 import { isValidity } from './shape.js'
+import { isKoineActor } from './types.js'
 import {
   KoineParseError,
   type KoineChainHeader,
@@ -66,6 +67,22 @@ function requireNumber(file: string, index: number, row: Record<string, unknown>
   const value = row[key]
   if (typeof value !== 'number' || !Number.isInteger(value)) {
     throw new KoineParseError(file, index + 1, `missing or non-integer field "${key}"`)
+  }
+  return value
+}
+
+/**
+ * The `actor` field of a commit, against the grammar §3.3 declares for it.
+ *
+ * It was `requireString` — any non-empty string — so `"bob"` was a valid commit
+ * actor while being invalid as a seal author and as a proposer. A grammar
+ * declared normatively in one section and enforced in none of the three places
+ * that use it is three different grammars wearing one name.
+ */
+function requireActor(file: string, index: number, row: Record<string, unknown>): string {
+  const value = requireString(file, index, row, 'actor')
+  if (!isKoineActor(value)) {
+    throw new KoineParseError(file, index + 1, `"actor": "${value}" is not actor:(user|agent):<id> (SPEC §3.3)`)
   }
   return value
 }
@@ -254,7 +271,7 @@ export function parseCommitsJsonl(text: string): KoineCommit[] {
     const row = parseLine(file, i, raw)
     return {
       seq: requireNumber(file, i, row, 'seq'),
-      actor: requireString(file, i, row, 'actor'),
+      actor: requireActor(file, i, row),
       what: requireString(file, i, row, 'what'),
       why: requireString(file, i, row, 'why'),
       when: requireString(file, i, row, 'when'),

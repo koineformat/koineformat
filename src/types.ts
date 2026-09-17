@@ -11,6 +11,26 @@
  * §4 the validity gradient.
  */
 
+/**
+ * `actor:(user|agent):<id>` — the ONE actor grammar, checked in one place.
+ *
+ * It was written three times with three different strictnesses, which a query
+ * for the shape found after the fourth review round: the seal required a
+ * non-empty id, the proposal envelope tested the prefix only, and
+ * `commits.jsonl` did not check at all. So `actor:user:` was a valid proposer
+ * and an invalid seal author, and the bare string `"bob"` was a valid commit
+ * actor and invalid everywhere else — while §3.3 declares the grammar normative
+ * for exactly that field.
+ *
+ * `role` narrows it where only one kind of actor is admissible — a delegation's
+ * `by` must be a person, its `agent` an agent.
+ */
+export function isKoineActor(value: unknown, role?: 'user' | 'agent'): boolean {
+  if (typeof value !== 'string') return false
+  const match = /^actor:(user|agent):(.+)$/.exec(value)
+  return match !== null && match[2] !== '' && (role === undefined || match[1] === role)
+}
+
 /** Full-sha256 content hash, prefixed — the ONE hash at the codec boundary. */
 export type KoineContentHash = `sha256:${string}`
 

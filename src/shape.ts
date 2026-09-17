@@ -126,3 +126,37 @@ export function declaredState(body: string): KoineValidity | undefined {
   if (block === undefined || isShapeProblem(block)) return undefined
   return block.state
 }
+
+/**
+ * The state that TRAVELS for one body — the law, in one place, for both emitters.
+ *
+ * It was written twice: once in `emitKoineTree` and once in `sealPackage`, after
+ * the second review round found that sealing dropped the state entirely. The
+ * repair for *a law with two enforcers* introduced a second enforcer — and a
+ * query for that shape, run after the fourth round, is what found it. Two copies
+ * of one rule do not stay equal; they stay equal until someone edits one.
+ *
+ * The body's shape block is the declaration (§4). The `asserted` value — a
+ * producer's field, or a prior identity-map row — answers only where the body is
+ * silent. A contradiction is returned rather than thrown, because the two
+ * callers owe different errors: an emit error and a manifest error.
+ */
+export function travellingState(
+  bytes: Uint8Array | string,
+  asserted: KoineValidity | undefined,
+): { readonly state?: KoineValidity; readonly conflict?: { readonly asserted: KoineValidity; readonly declared: KoineValidity } } {
+  let text: string
+  try {
+    text = typeof bytes === 'string' ? bytes : new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return asserted === undefined ? {} : { state: asserted } // a binary body carries no shape block
+  }
+  const block = readShapeBlock(text)
+  if (block === undefined || isShapeProblem(block) || block.state === undefined) {
+    return asserted === undefined ? {} : { state: asserted }
+  }
+  if (asserted !== undefined && asserted !== block.state) {
+    return { conflict: { asserted, declared: block.state } }
+  }
+  return { state: block.state }
+}

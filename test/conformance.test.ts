@@ -220,10 +220,9 @@ describe('C2 — historical resolution', () => {
     // approximate. "Historical resolution" is this sentence.
     const old = await hash(ARTICLE)
     expect(
-      resolveLocator(
+      await resolveLocator(
         { contentHash: old, selector: { type: 'text-quote', exact: 'Values above 4.0 block release.' } },
         ARTICLE,
-        old,
       ),
     ).toMatchObject({ status: 'resolved' })
   })
@@ -246,10 +245,9 @@ describe('C3 — traceable answers', () => {
     const contradicted = tree.edges.filter((e) => e.type === 'contradicts')
     expect(contradicted).toHaveLength(1)
     const body = tree.bodies.get('articles/wall-moisture.md') as string
-    const where = resolveLocator(
+    const where = await resolveLocator(
       observed[0]?.toLocator as NonNullable<(typeof observed)[0]['toLocator']>,
       body,
-      await hash(body),
     )
     expect(where).toMatchObject({ status: 'resolved', region: { text: 'Values above 4.0 block release.' } })
   })
