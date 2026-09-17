@@ -127,7 +127,12 @@ worthless.
 
 ### 2.1 `types/` — the four dictionaries
 
-One file per declared type, `$id`-stamped with `koine/types/<name>@v0`:
+One file per declared type. **The FILENAME is the binding** — §2.2 resolves a body's `kind:` to
+`types/<kind>.schema.json`, never to an `$id` — and koine stamps `$id` with `koine/types/<name>@v0`
+only where the document carries none. **A schema that arrives with its own `$id` keeps it**, and a
+reader strips only the stamp koine itself wrote. A codec that accepts an identifier and later
+substitutes a different one silently is worse than one that refuses it at the door; treating the
+stamp as koine's to own is how a `urn:` id came back as `koine/types/…` on the next emit.
 
 - **`<name>.schema.json`** — a **record type**: a JSON Schema document, carried verbatim
   beside its `$id`. A record type's dictionary entry is exactly
@@ -195,6 +200,16 @@ reuse, `dependentSchemas`, `dependentRequired`, `patternProperties`, `propertyNa
 `unevaluated*`, and `format` as an assertion are **outside** this profile; a record type that
 needs them is outside the shape block's reach, and saying so is cheaper than a reference
 implementation that carries a general validator.
+
+**A boolean IS a schema** (JSON Schema core): `true` admits every value, `false` admits none, and
+a validator MUST honour both wherever a subschema may appear — inside `not`, `properties`,
+`items`, `anyOf` and the rest. Treating a non-object schema as *nothing to check* inverts three
+keywords at once and fails OPEN in two of them.
+
+**Value equality ignores object key order.** `const` and `enum` compare shapes, and a shape's key
+order is not a fact about it: a record written by one producer and re-serialized by a reader is
+the same record. An equality that depended on serialization made `const` reject the very object it
+names.
 
 **One filename, one definition.** `types/<name>.schema.json` may be claimed either by a
 free-standing record type (§2.1) or by a kind that declares a payload shape — a kind that
@@ -588,6 +603,17 @@ A seal binds to content through hashes the tree already carries:
    verification at every grain: check the seal once, the root once, then the whole package
    *or any single file* against the identity map (chapter 7).
 
+   **The subject binds the PAPERS, not only the root hash**, and the distinction is the whole
+   of §7.5's tamper story. The root hash covers the tree and `koine.json` is not in the tree
+   (§7.3) — so a subject of `{name, version, integrity}` alone leaves `license`, `source`,
+   `terms`, `requires` and `status` unsigned, and an attacker may rewrite the rights or redirect
+   `payTo` without breaking a seal a buyer checks. The package subject therefore carries
+   **`papers`**: a `sha256:` digest over the manifest with `provenance.signature` removed, keys
+   recursively sorted, compact. Sorted keys are required here and nowhere else in this chapter
+   — a seal payload is authenticated as raw bytes (§6.4), but a manifest is re-serialized by
+   whoever reads it, so a digest over an unsorted projection would break on a reformat and train
+   readers to ignore it.
+
 ### 6.4 The envelope — a DSSE-compatible profile
 
 The seal travels as a detached JSON sidecar (`<file>.seal.json` beside a standalone file; the
@@ -710,8 +736,14 @@ The certificate is itself a DSSE envelope, `payloadType`
 
 signed by the **human's** key over its own PAE, exactly as a seal is.
 
-**Two bindings, and both are required.** A verifier MUST check that `agentPubkey` is the key
-that signed **this** seal, and that `agent` is the author **this** seal claims. Without the
+**The certificate is REQUIRED for an agent author, not merely checked when present.** A verifier
+MUST refuse a seal whose `author` begins `actor:agent:` and which carries no `delegation` — an
+absent mandate is not a satisfied one. A verifier that validated the certificate *if there was
+one* gave a correctly-signed agent seal with no mandate at all the same verdict as a mandated
+one, which is the defect this chapter exists to prevent.
+
+**Two further bindings, and both are required.** A verifier MUST check that `agentPubkey` is the
+key that signed **this** seal, and that `agent` is the author **this** seal claims. Without the
 first, a valid certificate minted for another agent can be pasted onto this envelope; without
 the second, an agent's certificate vouches for a seal claiming a different author.
 
@@ -940,6 +972,23 @@ map, and a tampered dictionary or history file it cannot even parse (the rows co
 (`test/tree.test.ts`, *"the envelope reach"*), roughly 18 lines. Verification of any single
 file at finer grain goes through the identity map (§3.2); the seal binds the papers on top
 (§6.3, grain 3): **seal → root hash → identity map → history.**
+
+**Sealing PRESERVES the identity map's meaning.** A tool that rebuilds `nodes.jsonl` from the
+files on disk MUST carry every semantic field a prior map held — `state` above all — and MUST
+carry rows that declare an **absent** body, which by construction have no file for a walk to
+find. A seal that kept only `{id, path, format, contentHash}` silently defeated the travel law
+over the package path while it held over the tree path: a frozen slice of five bodies admitted
+three, and the same tree sealed and re-exported admitted all five, including the draft the gate
+had refused. **A law with two enforcers is a law with a hole in it.**
+
+Where a body carries a shape block, its declaration and the map's row MUST agree at seal time,
+and a contradiction is an error (§4 rule 1) — sealing is precisely where a promotion that never
+reached the body would otherwise be laundered.
+
+**A declared absence is not drift.** A package check MUST NOT report a declared-absent body as
+missing, and MUST report a package as *incomplete* rather than *ok* when a body it declares
+`required` is not carried. Reporting `ok` there is the shape of error this standard names most
+often: a verdict whose good news covers a question nobody asked.
 
 ### 7.5 Terms — the SPDX atom and the priced half
 
@@ -1286,6 +1335,34 @@ undocumented behaviour; none is normative here:
 `team-decisions/conventions.md`:
 
 ```markdown
+### 7.15 The reference import flow — the composition, and what it does not decide
+
+The checks in this standard answer different questions and a consumer needs them composed, in
+one order, with one verdict. **A reference implementation SHOULD offer that composition as a
+single call**, and this one does (`admitPackage`):
+
+1. **the envelope and the bytes** — readable manifest, root hash, the identity map's listing, and
+   the lockfile pin when the consumer holds one (§7.3 · §7.4 · §7.7);
+2. **required capabilities** (§8.1), *before* any semantic check — a reader that does not
+   implement a required capability must not form an opinion about the content at all, because
+   its opinion would be the guess §8.1 exists to forbid;
+3. **schema and references** — every body against the record type it declares, every edge,
+   commit and Locator against what the tree holds (§3.5);
+4. **completeness** — no body the package declares `required` is absent (§3.2);
+5. **origin** — any seal that travelled verifies (chapter 6). An absent seal does not refuse; a
+   seal that was OFFERED and does not verify does. The gate is on offering one at all, never on
+   it being honest once offered.
+
+The verdict names the FIRST step that refused and carries every sub-verdict unmodified, so
+nothing hides behind the first answer.
+
+**What it does not decide, stated because a composed `true` invites the assumption:** admission
+is not activation. Whether the publisher is trusted, whether the licence permits the use, what
+the declared status source says today (§7.3 — fetching it is the consumer's act, not the
+format's), and whatever the domain requires on top are the application's, and no verdict here
+speaks for them. **Not every function must do every job; no function's result may suggest a
+success wider than the question it asked.**
+
 # Conventions
 
 - Never deploy on Friday. See incident #44.
@@ -1533,6 +1610,56 @@ and for a year it did not.
 ---
 
 ## Changelog
+
+### 2026-09-17 (later the same day) — what an outside review found in the repair
+
+0.6.0 shipped in the morning. By the afternoon the project that had reported the first round had
+re-read the published distribution against the registry checksum and returned **seven further
+findings**, every one reproduced. Six are repaired here; the seventh is answered as a contract.
+
+**All of them lived BETWEEN the pieces, and that is the lesson worth keeping.** Each function
+was green. Each law was proven where it was written. The suite had 212 passing tests.
+
+- **The package seal dropped the meaning it was handed.** `sealPackage` rebuilt the identity map
+  from the files on disk and kept four fields, so `state` died at the package boundary and rows
+  declaring an **absent** body vanished entirely — they have no file for a walk to find. A frozen
+  slice of five bodies admitted three; the same tree sealed and re-exported admitted all five,
+  **including the draft the gate had refused**, and a package missing a `required` piece of
+  evidence then verified `ok`. §7.4 now requires preservation, a body that contradicts its own
+  row is an error at seal, and a declared absence is reported as *incomplete* rather than as
+  drift or as nothing. **A law with two enforcers is a law with a hole in it.**
+- **An agent author with no mandate verified.** `verifySeal` checked the delegation certificate
+  *if one was present*. §6.7 now requires it for any `actor:agent:` author, because an absent
+  mandate is not a satisfied one — the same shape as a `null` origin verdict, one layer down.
+- **The package signature did not bind the papers.** The subject was `{name, version, integrity}`
+  and the root hash excludes `koine.json` (§7.3), so `license`, `source`, `terms`, `requires` and
+  `status` sat outside the signature — while §7.5 stakes the whole tamper story of the priced
+  half on `payTo` being *inside the sealed papers*. The subject now carries **`papers`**, a digest
+  over the manifest less its own signature field, with sorted keys because a manifest is
+  re-serialized by whoever reads it.
+- **Nothing composed the checks.** A required capability could be *named* by `checkCapabilities`
+  and never *refused* by any verification. New **§7.15** documents the reference import flow —
+  integrity, then capabilities *before any semantic check*, then schema and references, then
+  completeness, then origin — naming the first step that refuses and carrying every sub-verdict
+  through. And saying what a composed `true` does not mean: **admission is not activation.**
+- **The proposal ignored its own declarations.** The `schema` id was never read, so a proposal
+  naming a record type that does not exist received `ready`; and acceptance wrote back to the
+  path the proposal was *drafted* against, so a renamed document — which resolves correctly by id,
+  since an id outlives a path — got a stale twin while the real body went untouched. Both are
+  refused now, and the receipt reports the resolved target and whether it moved.
+- **A boolean is a schema**, and the validator treated one as *nothing to check* — inverting
+  `not`, `properties` and `items`, two of them failing open. `const` and `enum` also compared
+  serialized key order, so an object `const` rejected the very object it names.
+- **B7, answered as a contract rather than a patch.** A record schema arriving with its own
+  `$id` had it silently replaced by `koine/types/<name>@v0` on the next emit. §2.1 now says what
+  was always true and never written: **the FILENAME is the binding** (§2.2 resolves `kind:` to a
+  path, never to an `$id`), so koine stamps only where a document carries none, and a reader
+  strips only the stamp koine itself wrote.
+
+**What did not change, and was asked about:** the conformance suite shipped in 0.6.0 is an
+UPSTREAM test written on the basis of external criteria. It is not a passed acceptance and it is
+not a second independent implementation, and the register now says so in those words — borrowing
+a reviewer's criteria does not borrow their independence.
 
 ### 2026-09-17 — the seal: chapter 6 closes, and the gap's own plan is corrected
 

@@ -298,7 +298,7 @@ describe('R4 — a change to a number and a change to a nested object round-trip
 describe('R5 — acceptance edits the body and appends ONE commit bound to that node', () => {
   it('rewrites the declarations, leaves the prose, and binds the commit', async () => {
     const p = await proposal()
-    const accepted = acceptProposal(p, BODY, '2026-09-17T09:00:00Z')
+    const accepted = acceptProposal(p, { path: 'definitions/active-member.md', body: BODY }, '2026-09-17T09:00:00Z')
     expect(accepted.bytes).toContain('filter: qualifying-act within 60d')
     expect(accepted.bytes).toContain('window: 60')
     expect(accepted.bytes).toContain('Prose above the block')
@@ -309,7 +309,7 @@ describe('R5 — acceptance edits the body and appends ONE commit bound to that 
 
   it('recomputes the node’s contentHash by re-emitting — the ritual §5 describes, verified', async () => {
     const p = await proposal()
-    const accepted = acceptProposal(p, BODY, '2026-09-17T09:00:00Z')
+    const accepted = acceptProposal(p, { path: 'definitions/active-member.md', body: BODY }, '2026-09-17T09:00:00Z')
     const files = await emitKoineTree({
       nodes: [{ id: 'n-def', path: accepted.path, format: 'markdown', bytes: accepted.bytes }],
       commits: [
@@ -345,7 +345,7 @@ describe('the two grains meet — a text-range proposal and a field-wise one, on
     expect(validateProposalEnvelope(p)).toEqual([])
     expect(receiveProposal(p, tree, files).status).toBe('ready')
 
-    const accepted = acceptProposal(p, BODY, '2026-09-17T09:00:00Z')
+    const accepted = acceptProposal(p, { path: 'definitions/active-member.md', body: BODY }, '2026-09-17T09:00:00Z')
     expect(accepted.bytes).toContain('The amended trailing prose.')
     expect(accepted.bytes).toContain('kind: metric-definition')
     expect(accepted.commit.node).toBe('n-def')

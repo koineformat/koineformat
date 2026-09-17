@@ -38,7 +38,7 @@
  * verifier is ~50 lines in any language.*
  */
 
-import { sha256Bytes } from './sha256.js'
+import { sha256Bytes, sha256Hex } from './sha256.js'
 import type { KoineContentHash } from './types.js'
 
 /** The DSSE `payloadType` of a koine seal. */
@@ -56,8 +56,19 @@ export type KoineSealSubject =
   | { readonly grain: 'chain-head'; readonly hash: string }
   /** A single file, via its `contentHash` in the identity map. */
   | { readonly grain: 'file'; readonly nodeId: string; readonly path: string; readonly contentHash: KoineContentHash }
-  /** A package, via the root hash its manifest carries. */
-  | { readonly grain: 'package'; readonly name: string; readonly version: string; readonly integrity: KoineContentHash }
+  /**
+   * A package: the root hash its manifest carries, AND a digest over the
+   * manifest's own papers — rights, origin, terms, required capabilities,
+   * status. The root hash alone leaves every one of those unsigned (§7.3
+   * excludes `koine.json` from it), which is B3.
+   */
+  | {
+      readonly grain: 'package'
+      readonly name: string
+      readonly version: string
+      readonly integrity: KoineContentHash
+      readonly papers: string
+    }
 
 /** The authenticated payload of a seal. Every field here is INSIDE the signature. */
 export interface KoineSealPayload {
@@ -230,6 +241,8 @@ export function readSealPayload<T>(envelope: KoineDsseEnvelope): T {
 /** Why a seal did not verify — machine-readable, so a surface can say which step failed. */
 export type SealFailure =
   | 'malformed'
+  /** An `actor:agent:` author with no delegation certificate — §6.7 requires one. */
+  | 'delegation-missing'
   | 'wrong-payload-type'
   | 'wrong-method'
   | 'subject-mismatch'
@@ -289,6 +302,16 @@ export async function verifySeal(
   if (!sameSubject(payload.subject, actualSubject)) return { valid: false, reason: 'subject-mismatch' }
   if (!verify(signature, message, pubkey)) return { valid: false, reason: 'bad-signature' }
 
+  // **B2, reported by an outside reviewer 2026-09-17.** The chapter says the
+  // certificate carries an agent's mandate IN the artifact; this code checked it
+  // only when one happened to be present, so `author: actor:agent:X` with no
+  // certificate at all verified `valid: true`. An absent mandate read exactly
+  // like a satisfied one — the same defect shape as a `null` origin verdict, one
+  // layer down: the missing thing and the good answer shared a spelling.
+  if (payload.author.startsWith('actor:agent:') && payload.delegation === undefined) {
+    return { valid: false, reason: 'delegation-missing' }
+  }
+
   if (payload.delegation !== undefined) {
     const chain = await verifyDelegation(payload.delegation, verify)
     if (chain.reason !== undefined) return { valid: false, reason: chain.reason }
@@ -343,13 +366,73 @@ export const fileSubject = (nodeId: string, path: string, contentHash: KoineCont
 /** The subject for a tree-grain seal — one signature vouching the whole history under a head. */
 export const chainHeadSubject = (hash: string): KoineSealSubject => ({ grain: 'chain-head', hash })
 
-/** The subject for a package-grain seal — the root hash the manifest carries. */
-export const packageSubject = (name: string, version: string, integrity: KoineContentHash): KoineSealSubject => ({
+/**
+ * The subject for a package-grain seal.
+ *
+ * **B3, reported by an outside reviewer 2026-09-17, and it was the serious one.**
+ * This used to be `{name, version, integrity}` alone — and `integrity` is the
+ * root hash over the *tree*, which by §7.3 excludes `koine.json` itself. So
+ * `license`, `source`, `terms`, `requires` and `status` all sat OUTSIDE the
+ * signature: an attacker could rewrite the rights, the origin URL, the required
+ * capabilities or the payment address and the seal still verified.
+ *
+ * §7.5 stakes the whole tamper story of the priced half on the opposite: *"`payTo`
+ * sits inside the sealed papers, and redirecting payment to an attacker's address
+ * means breaking the seal a buyer checks before paying."* It did not.
+ *
+ * So the subject now carries `papers` — a digest over the manifest's canonical
+ * projection, every field except the signature itself. One digest rather than
+ * the fields inline, because the payload must stay small enough to read and the
+ * projection must stay stable as §7.3 grows.
+ */
+export const packageSubject = (
+  name: string,
+  version: string,
+  integrity: KoineContentHash,
+  papers: string,
+): KoineSealSubject => ({
   grain: 'package',
   name,
   version,
   integrity,
+  papers,
 })
+
+/**
+ * The bytes a package seal commits to beyond its tree: the manifest with the
+ * signature field removed, keys sorted, compact.
+ *
+ * Sorted keys are required HERE and nowhere else in this chapter — a seal
+ * payload is authenticated as raw bytes (§6.4), but a *manifest* is written by
+ * whoever publishes and re-serialized by whoever reads, so its key order is not
+ * a stable fact. A digest over an unsorted projection would be a signature that
+ * breaks on a reformat, which trains readers to ignore it.
+ */
+export function manifestPapers(manifest: Readonly<Record<string, unknown>>): Promise<string> {
+  const withoutSignature = { ...manifest }
+  const provenance = withoutSignature['provenance']
+  if (typeof provenance === 'object' && provenance !== null) {
+    const { signature: _signature, ...rest } = provenance as Record<string, unknown>
+    withoutSignature['provenance'] = rest
+  }
+  return sha256Hex(encoder.encode(canonicalJson(withoutSignature))).then(hex => `sha256:${hex}`)
+}
+
+/** Recursively sorted, `undefined` dropped — the one canonicalization this chapter needs. */
+function canonicalJson(value: unknown): string {
+  const canonical = (v: unknown): unknown => {
+    if (v === null) return null
+    if (Array.isArray(v)) return v.map(canonical)
+    if (typeof v !== 'object') return v
+    const out: Record<string, unknown> = {}
+    for (const key of Object.keys(v as Record<string, unknown>).sort()) {
+      const inner = (v as Record<string, unknown>)[key]
+      if (inner !== undefined) out[key] = canonical(inner)
+    }
+    return out
+  }
+  return JSON.stringify(canonical(value))
+}
 
 // ---------------------------------------------------------------------------
 // npub — NIP-19 bech32, because §6.4 says "npub-encoded" and means it

@@ -65,7 +65,28 @@ function typeMatches(declared: string, actual: string): boolean {
   return declared === 'number' && actual === 'integer'
 }
 
-const deepEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
+/**
+ * Canonical JSON: recursively sorted keys, arrays left alone. A shape's key
+ * ORDER is not a fact about it — a manifest written by one producer and
+ * re-serialized by a reader is the same shape — and an equality that depended on
+ * it made `const` reject the very object it names. Reported as B6.
+ */
+export function canonicalJson(value: unknown): string {
+  const canonical = (v: unknown): unknown => {
+    if (v === null || typeof v !== 'object') return v
+    if (Array.isArray(v)) return v.map(canonical)
+    const out: Record<string, unknown> = {}
+    for (const key of Object.keys(v as Record<string, unknown>).sort()) {
+      const inner = (v as Record<string, unknown>)[key]
+      if (inner !== undefined) out[key] = canonical(inner)
+    }
+    return out
+  }
+  return JSON.stringify(canonical(value))
+}
+
+/** Value equality that ignores object key order — see {@link canonicalJson}. */
+export const deepEqual = (a: unknown, b: unknown): boolean => canonicalJson(a) === canonicalJson(b)
 
 /**
  * Validate a value against a record type's schema. Returns every problem found,
@@ -73,9 +94,17 @@ const deepEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSO
  * at a field rather than at a file.
  */
 export function validateAgainstSchema(value: unknown, schema: unknown, at = ''): string[] {
+  const where = at === '' ? 'the body' : `"${at}"`
+  // **A BOOLEAN IS A SCHEMA** (JSON Schema core, "Boolean JSON Schemas"): `true` admits every
+  // value, `false` admits none. Treating a non-object schema as "nothing to
+  // check" — which this did until 0.7.0 — inverts three keywords at once:
+  // `{"not": false}` rejected everything (its subschema "passed"),
+  // `{"properties": {"x": false}}` admitted the forbidden value, and
+  // `{"items": false}` admitted every array. Reported as B6.
+  if (schema === true) return []
+  if (schema === false) return [`${where} is present, and the record type admits no value here`]
   if (!isObject(schema)) return []
   const problems: string[] = []
-  const where = at === '' ? 'the body' : `"${at}"`
 
   const type = schema['type']
   if (typeof type === 'string' || Array.isArray(type)) {
@@ -131,7 +160,7 @@ export function validateAgainstSchema(value: unknown, schema: unknown, at = ''):
     if (typeof min === 'number' && value.length < min) problems.push(`${where} has fewer than ${min} items`)
     if (typeof max === 'number' && value.length > max) problems.push(`${where} has more than ${max} items`)
     const items = schema['items']
-    if (isObject(items)) {
+    if (isObject(items) || typeof items === 'boolean') {
       value.forEach((item, i) => problems.push(...validateAgainstSchema(item, items, `${at}/${i}`)))
     }
   }

@@ -46,7 +46,22 @@ const pretty = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
 
 /** `types/<name>.schema.json` — the record type's JSON Schema, `$id`-stamped. */
 export function emitRecordTypeJson(record: KoineRecordType): string {
-  return pretty({ $id: typeId(record.name), ...record.schema })
+  // **The filename is koine's addressing; `$id` belongs to the schema's author.**
+  //
+  // Section 2.2 binds a body's `kind:` to `types/<kind>.schema.json` — the PATH,
+  // not the `$id` — so the stamp was always a convenience for a reader holding
+  // one file, never the binding. Treating it as koine's to own produced B7
+  // (reported 2026-09-17): the emitter accepted an incoming `urn:example:pilot:1`
+  // because the spread landed after the stamp, the parser then stripped `$id`
+  // unconditionally, and a re-emit replaced it with `koine/types/pilot@v0`.
+  // A codec that accepts an identifier and later substitutes a different one
+  // silently is worse than one that refuses it at the door.
+  //
+  // So: a schema carrying its own `$id` keeps it, and koine stamps only where
+  // there is none.
+  return Object.hasOwn(record.schema, '$id')
+    ? pretty({ ...record.schema })
+    : pretty({ $id: typeId(record.name), ...record.schema })
 }
 
 /** `types/<name>.tagtype.json` — the Kind's declared behaviour facets, then its custody. */
@@ -188,14 +203,20 @@ export function parseEdgeTypeJson(
 }
 
 /**
- * `types/<name>.schema.json` → a Record type. The file IS the JSON Schema with
- * a `$id` stamped on it, so the inverse strips `$id` and keeps the rest
- * verbatim — a schema key this codec does not know still survives the trip.
+ * `types/<name>.schema.json` -> a Record type. The file IS the JSON Schema, so
+ * the inverse keeps it verbatim — a schema key this codec does not know still
+ * survives the trip.
+ *
+ * **`$id` is stripped only when koine stamped it**, which is the exact inverse of
+ * {@link emitRecordTypeJson}. Stripping unconditionally is what made a foreign
+ * `$id` vanish and come back as koine's on the next emit (B7): the parser threw
+ * away a fact it did not own.
  */
 export function parseRecordTypeJson(
   name: string,
   raw: Readonly<Record<string, unknown>>,
 ): KoineRecordType {
+  if (raw['$id'] !== typeId(name)) return { name, schema: raw }
   const { $id: _id, ...schema } = raw
   return { name, schema }
 }

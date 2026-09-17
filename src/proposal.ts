@@ -26,7 +26,7 @@
  */
 
 import { resolveLocator } from './locator.js'
-import { coerceShapeValues, validateAgainstSchema } from './schema.js'
+import { coerceShapeValues, deepEqual, validateAgainstSchema } from './schema.js'
 import { isShapeProblem, readShapeBlock } from './shape.js'
 import type {
   KoineContentHash,
@@ -209,9 +209,16 @@ export interface KoineReceipt {
   readonly conflicts: readonly KoineConflict[]
   /** Questions the proposer could not decide — carried to the decider, never resolved here. */
   readonly openQuestions: readonly KoineOpenQuestion[]
+  /**
+   * The node as the tree holds it NOW — present whenever the target resolved.
+   *
+   * `path` may differ from `target.path`: an id outlives a path, so a document
+   * renamed since drafting still resolves, and this is the only safe write
+   * target. `renamed` says so out loud, because a receiver that silently
+   * re-pointed would hide a fact the decider may want.
+   */
+  readonly resolved?: { readonly nodeId: string; readonly path: string; readonly renamed: boolean }
 }
-
-const deepEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
 
 /** The shape a body currently declares, coerced against its record type. */
 function currentShapeOf(
@@ -283,9 +290,18 @@ export function receiveProposal(
   }
   const text = typeof body === 'string' ? body : new TextDecoder().decode(body)
 
-  return isBodyProposal(p)
+  // The node as the tree holds it NOW. A rename is not a failure — an id
+  // outlives a path (§3.2) — but it IS a fact the caller must have, because the
+  // drafted path is no longer a safe write target.
+  const resolved = {
+    nodeId: node.id,
+    path: node.path,
+    renamed: node.path !== p.target.path,
+  }
+  const receipt = isBodyProposal(p)
     ? receiveBodyProposal(p, text, node.contentHash, openQuestions)
     : receiveShapeProposal(p, text, tree, openQuestions)
+  return { ...receipt, resolved }
 }
 
 /** A body proposal: the addressed region must BE what the change says it replaces. */
@@ -346,6 +362,16 @@ function receiveShapeProposal(
   const resulting = p.resultingShape as Record<string, unknown>
   const kind = typeof resulting['kind'] === 'string' ? (resulting['kind'] as string) : undefined
   const record = kind === undefined ? undefined : recordSchemaFor(tree, kind)
+
+  // **B5a, reported 2026-09-17.** `schema` is a DECLARED field of the envelope
+  // and nothing read it: the record type was resolved from `resultingShape.kind`
+  // alone, so a proposal naming a record type that does not exist — or naming a
+  // different one than it actually changes — received `ready`. A declaration
+  // nobody checks is worse than an absent one: it reads as agreement.
+  const schemaProblem = schemaIdProblem(p.schema, kind, tree)
+  if (schemaProblem !== undefined) {
+    return { status: 'invalid', problems: [schemaProblem], conflicts: [], openQuestions }
+  }
   const { shape: current, problem } = currentShapeOf(text, record)
   if (problem !== undefined) {
     return { status: 'invalid', problems: [problem], conflicts: [], openQuestions }
@@ -423,6 +449,31 @@ function receiveShapeProposal(
   return { status: 'ready', problems: [], conflicts, openQuestions }
 }
 
+/**
+ * Does the proposal's declared `schema` name the record type it actually
+ * changes, and does this tree carry it?
+ *
+ * The id form is the one the emitter stamps, `koine/types/<name>@v0` — so a bare
+ * name is accepted too, because a producer that writes the name rather than the
+ * full id is unambiguous and refusing it would be pedantry. What is refused is a
+ * declaration that points somewhere else, or nowhere.
+ */
+function schemaIdProblem(
+  schema: string,
+  kind: string | undefined,
+  tree: ParsedKoineTree,
+): string | undefined {
+  const match = /^koine\/types\/(.+?)@v\d+$/.exec(schema)
+  const named = match?.[1] ?? schema
+  if (kind !== undefined && named !== kind) {
+    return `the proposal declares schema "${schema}" and changes a body of kind "${kind}" — one of the two is wrong`
+  }
+  if (recordSchemaFor(tree, named) === undefined) {
+    return `the proposal declares schema "${schema}" and this tree carries no record type "${named}"`
+  }
+  return undefined
+}
+
 /** The record type a tree carries for a kind — free-standing, or docked onto a Kind. */
 function recordSchemaFor(tree: ParsedKoineTree, kind: string): Readonly<Record<string, unknown>> | undefined {
   const record = (tree.dictionaries.records ?? []).find((r) => r.name === kind)
@@ -475,9 +526,21 @@ export interface KoineAcceptance {
  */
 export function acceptProposal(
   proposal: KoineProposal,
-  body: string,
+  /**
+   * The node AS THE TREE HOLDS IT NOW — its current path and body.
+   *
+   * **B5b, reported 2026-09-17.** This used to take the body alone and return
+   * `proposal.target.path` as the write target. An id outlives a path (§3.2), so
+   * a document renamed after the proposal was drafted resolved correctly by id,
+   * received `ready`, and then had its acceptance written back to the OLD path —
+   * creating a stale twin and leaving the real body untouched. The parameter is
+   * required rather than optional because the mistake is not a caller's
+   * oversight to make: the only safe target is the one the receiver resolved.
+   */
+  current: { readonly path: string; readonly body: string },
   when: string,
 ): KoineAcceptance {
+  const body = current.body
   const commit = {
     actor: proposal.proposer,
     what: proposal.changes.map((c) => c.field).join(', '),
@@ -501,9 +564,9 @@ export function acceptProposal(
       String(change.to),
       points.slice(resolution.region.end).join(''),
     ].join('')
-    return { path: proposal.target.path, bytes, commit }
+    return { path: current.path, bytes, commit }
   }
-  return { path: proposal.target.path, bytes: applyShape(body, proposal), commit }
+  return { path: current.path, bytes: applyShape(body, proposal), commit }
 }
 
 /** Rewrite the shape block's declarations to the proposal's resulting shape, leaving prose untouched. */

@@ -18,9 +18,11 @@ import { SPEC_VERSION } from "./types.js";
 import { MANIFEST_NAME, MANIFEST_NAME_V0, manifestFromFiles } from "./manifest.js";
 import { rootHash } from "./integrity.js";
 import { assertSafeRelPath } from "./paths.js";
+import { errBadManifest } from "./errors.js";
 import { sha256Hex } from "../sha256.js";
 import { emitNodesJsonl, parseNodesJsonl } from "../sidecars.js";
-import type { KoineNodeEntry } from "../types.js";
+import { isShapeProblem, readShapeBlock } from "../shape.js";
+import type { KoineNodeEntry, KoineValidity } from "../types.js";
 
 /** Where the identity map lives inside a package (SPEC §3.2 · §7.2). */
 export const NODES_PATH = ".koine/nodes.jsonl";
@@ -44,6 +46,45 @@ async function mintId(path: string, bytes: Uint8Array): Promise<string> {
   const pathDigest = await sha256Hex(path);
   const contentDigest = await sha256Hex(bytes);
   return `n-${(await sha256Hex(`${pathDigest}:${contentDigest}`)).slice(0, 12)}`;
+}
+
+
+/**
+ * The validity state a sealed row carries — the SAME resolution `emitKoineTree`
+ * performs, and the reason this helper exists rather than a second reading.
+ *
+ * Sealing used to keep four fields (`id`, `path`, `format`, `contentHash`) and
+ * drop everything else, which quietly defeated the travel law over the PACKAGE
+ * path while it held over the tree path: emit a frozen slice of five bodies and
+ * three survive; seal it, re-emit, and all five come back — including the draft
+ * the gate had refused. One law with two emitters is one law with a hole in it.
+ *
+ * The body's shape block is the declaration (SPEC §4); the prior row's `state`
+ * is a producer's assertion and answers only where the body is silent. A body
+ * that contradicts its own prior row is an error rather than a silent pick, for
+ * the reason §4 rule 1 gives: a promotion that never reached the body is a
+ * defect, and sealing is exactly where it would be laundered.
+ */
+function resolveSealedState(
+  path: string,
+  bytes: Uint8Array,
+  prior: KoineValidity | undefined,
+): KoineValidity | undefined {
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return prior; // a binary body carries no shape block
+  }
+  const block = readShapeBlock(text);
+  if (block === undefined || isShapeProblem(block) || block.state === undefined) return prior;
+  if (prior !== undefined && prior !== block.state) {
+    throw errBadManifest(
+      `"${path}" is listed as "${prior}" in the identity map and declares "${block.state}" in its own `
+      + `shape block — promote the body, or stop asserting a state it does not carry (SPEC §4 rule 1)`,
+    );
+  }
+  return block.state;
 }
 
 /** True for the payload files the identity map lists — bodies, never sidecars. */
@@ -95,13 +136,28 @@ export async function sealPackage(
     assertSafeRelPath(path);
     const bytes = files.get(path)!;
     const prior = existing.get(path);
+    const state = resolveSealedState(path, bytes, prior?.state);
     rows.push({
       id: prior?.id ?? (await mintId(path, bytes)),
       path,
       format: prior?.format ?? formatOf(path),
       contentHash: `sha256:${await sha256Hex(bytes)}`,
+      ...(state !== undefined ? { state } : {}),
     });
   }
+
+  // A DECLARED ABSENCE has no file, so the walk above cannot see it — and the
+  // walk is the only thing that used to build this map. That is how sealing a
+  // package silently deleted its own statement that a required body was not
+  // carried: the row vanished, the tree then verified `ok`, and a reader had no
+  // way to learn the evidence was missing. Absent rows are carried from the
+  // prior identity map verbatim; nothing in the file set can confirm or deny
+  // them, which is exactly what makes them a DECLARATION.
+  for (const row of existing.values()) {
+    if (row.absent !== undefined && !files.has(row.path)) rows.push(row);
+  }
+  rows.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
   files.set(NODES_PATH, new TextEncoder().encode(emitNodesJsonl(rows)));
 
   // 2 — a migrating package leaves the v0 manifest behind BEFORE the root is

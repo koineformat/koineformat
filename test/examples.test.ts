@@ -175,7 +175,7 @@ describe('examples/proposals — the day-one gesture, against the tree it target
 
     // …and accepting it edits the addressed region and nothing else.
     const body = text(files.get('definitions/active-member.md') as Uint8Array)
-    const accepted = acceptProposal(proposal, body, '2026-09-17T12:00:00Z')
+    const accepted = acceptProposal(proposal, { path: 'definitions/active-member.md', body }, '2026-09-17T12:00:00Z')
     expect(accepted.bytes).toContain('and nothing has to enforce that')
     expect(accepted.bytes).toContain('kind: metric-definition')
     expect(accepted.commit.node).toBe('n-d27727adce6c')
@@ -190,7 +190,7 @@ describe('examples/proposals — the day-one gesture, against the tree it target
       await readFile(join(proposalsDir, 'active-member-60d.proposal.json'), 'utf8'),
     ) as KoineProposal
     const body = text(files.get('definitions/active-member.md') as Uint8Array)
-    const accepted = acceptProposal(proposal, body, '2026-09-17T12:00:00Z')
+    const accepted = acceptProposal(proposal, { path: 'definitions/active-member.md', body }, '2026-09-17T12:00:00Z')
     const after = await emitKoineTree({
       nodes: tree.nodes.map((n) => ({
         id: n.id,

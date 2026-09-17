@@ -25,7 +25,7 @@ keep resolving — and points here.
 | **blocked-on** | entry ids, or `trigger:"<falsifiable event>"` |
 | **verified** | the last date the claim was checked **against the code**, not against this file |
 
-**Two rules, both learned the hard way.**
+**Three rules, all learned the hard way.**
 
 1. **A gap whose closing condition is an extraction names the artifact it will extract FROM,
    and checks that it exists.** Declared gap 2 waited a year to be *"extracted from the
@@ -35,6 +35,12 @@ keep resolving — and points here.
 2. **A finder without a declared population is an opinion.** Each of the three structural
    guards in [`test/guards.test.ts`](test/guards.test.ts) names its population: sections with
    normative language · every `§` any source or test cites · the canonical emission's bytes.
+3. **A law with two enforcers is a law with a hole in it.** Seven of the nine defects found by
+   outside review lived BETWEEN the pieces, not inside them — the travel law held in
+   `emitKoineTree` and not in `sealPackage`, a capability could be named and never refused, a
+   verifier checked a mandate only where one already was. Every piece was green. **A new law
+   owes a test of the whole path it governs, not only of its own function**, and that is what
+   [`test/composition.test.ts`](test/composition.test.ts) is for.
 
 ---
 
@@ -117,6 +123,45 @@ source, PDF, media, structured rows. **How each degrades for a format nobody has
 is not assumed here and is not answered either.** A new row is written when a producer earns
 it, never on speculation.
 
+### KF-20260917-status-source-is-declared-and-never-fetched
+**status:** open · **opened:** 2026-09-17 · **verified:** 2026-09-17
+**receipt:** a fixture in which a `withdrawn` status source removes a package from a consumer's
+answer context — or a written ruling that fetching is wholly the consumer's and the form says
+only *where*
+**blocked-on:** []
+
+§7.3 declares where a package's standing is published and what a reader MUST do when it cannot
+be reached. **Nothing fetches it**, and the 2026-09-17 review said so plainly: *"Statusabruf,
+Freigabelaufzeit und tatsächliche Bereinigung von Such-/Antwortkontext sind nicht ausgeführt."*
+The declaration is honest and the mechanism is deliberately outside the format — but *how much*
+is outside has never been written down, and a consumer cannot implement a rule whose boundary is
+implied.
+
+### KF-20260917-history-has-no-content-revisions
+**status:** open · **opened:** 2026-09-17 · **verified:** 2026-09-17
+**receipt:** a fixture resolving a historical claim against the body revision it was made about,
+from the tree alone
+**blocked-on:** [KF-20260917-package-and-schema-migration]
+
+`commit.node` binds a commit to a body (§3.3) and **not to a version of it**: there are no
+before/after content hashes and no earlier body files, so a tree cannot answer *what did this
+say when that claim was made*. The 2026-09-17 review's verdict is the precise one — *"teilweise
+verbessert, nicht geschlossen. Atlas muss unveränderliche Revisionen weiterhin selbst halten."*
+Every consumer that needs historical resolution therefore holds its own revision store beside
+the form, which is a lossy boundary wearing a workaround.
+
+### KF-20260917-free-text-history-is-unclassifiable
+**status:** open · **opened:** 2026-09-17 · **verified:** 2026-09-17
+**receipt:** a fixture in which a frozen slice's surviving commits are filterable by SUBJECT, not
+only by bound node
+**blocked-on:** []
+
+Chapter 4 rule 5 filters history by `commit.node`, and the id-leak scan catches an excluded id
+spelled in prose. Neither reaches a commit whose `what`/`why` discusses withheld material without
+naming it. *"Freitext ohne Objektbindung/ID bleibt unklassifizierbar"* — so a slice's redaction is
+mechanical for what is bound and a judgment call for what is written, and the form does not say
+which it guarantees.
+
 ---
 
 ## Closed
@@ -130,6 +175,13 @@ it, never on speculation.
 | **KF-20260827-terms-grammar** *(SPEC declared gap 5)* | 2026-08-27 — §7.5 froze; its carry-verbatim rule got its first test 2026-09-17 |
 | **KF-20260916-seal** *(SPEC declared gap 2)* | 2026-09-17 — §6.4's payload enumeration, §6.7's certificate, `test/vectors/seal-v0.json`. See rule 1 above for why the original plan could not have worked |
 | **KF-20260916-outward-claims** | 2026-09-17 — the README said *"not yet published"* while npm served `0.1.2` for three weeks. Now checked by `test/guards.test.ts` |
+| **KF-20260917-B1-seal-drops-meaning** | 2026-09-17 — `sealPackage` kept four fields and rebuilt from files, so `state` and `absent` rows died at the package boundary; §7.4 now requires preservation and `test/composition.test.ts` runs `emit → seal → parse → frozen export` whole |
+| **KF-20260917-B2-agent-without-mandate** | 2026-09-17 — an `actor:agent:` author with no delegation certificate verified `valid: true`; §6.7 now requires the mandate and `verifySeal` answers `delegation-missing` |
+| **KF-20260917-B3-seal-misses-the-papers** | 2026-09-17 — the package subject was `{name, version, integrity}` and the root hash excludes `koine.json`, so licence, source, terms, `requires` and `status` were unsigned. `packageSubject` now binds `papers`, a digest over the manifest less its own signature |
+| **KF-20260917-B4-no-composed-contract** | 2026-09-17 — the checks existed and nothing composed them, so a required capability could be *named* and never *refused*. New §7.15 and `admitPackage` |
+| **KF-20260917-B5-proposal-target-and-schema** | 2026-09-17 — the declared `schema` id was never read, and acceptance wrote to the drafted path after a rename. Both refused now; the receipt reports the resolved target |
+| **KF-20260917-B6-schema-subset-conformance** | 2026-09-17 — a boolean is a schema (three keywords inverted, two failing open), and `const`/`enum` compared serialized key order |
+| **KF-20260917-B7-schema-id-substituted** | 2026-09-17 — the emitter accepted a foreign `$id` and the parser stripped it, so a re-emit substituted koine's. §2.1 now says the FILENAME binds and the author's `$id` travels |
 
 ---
 
@@ -139,13 +191,33 @@ it, never on speculation.
 
 - **the three structural guards** ([`test/guards.test.ts`](test/guards.test.ts)) — text-vs-code
   drift, dangling citations, emission stability. They run in CI on every push.
-- **the conformance suite** ([`test/conformance.test.ts`](test/conformance.test.ts)) — the
-  first consumer's own five acceptance criteria, as compositions. Written by the party that has
-  to USE the form, which is the cheapest independent second-implementation pressure there is,
-  and the reason they found what a green in-house suite did not: **they test compositions, and
-  the in-house suite tested each law alone.**
+- **the conformance suite** ([`test/conformance.test.ts`](test/conformance.test.ts)) — UPSTREAM
+  tests written here, on the basis of a prospective consumer's five published acceptance
+  criteria. Their value is that the criteria are external: they test compositions, which is
+  where a green in-house suite was blind.
+
+  **Corrected 2026-09-17, at that consumer's request, and the correction matters more than the
+  wording.** This file called them *"the first consumer's own acceptance criteria"* and *"the
+  cheapest independent second-implementation pressure there is."* They are neither. They are
+  **not a passed acceptance** — no one has accepted anything — and they are **not a second
+  independent implementation**: they run in this repository, against this codec, written by its
+  editors. Borrowing a reviewer's criteria does not borrow their independence, and a suite that
+  claims it is a suite that will be believed past its evidence. The 2026-09-17 review found
+  seven further defects while these tests were green, which is the measurement of exactly how
+  much they prove. §5.6's claim ratchet applies to this repository's own README and register
+  first.
 - **the cross-implementation test** ([`test/examples.test.ts`](test/examples.test.ts)) — the
   example tree's sidecars come from a different implementation than the codec that reads them.
+- **the review counter-probes** ([`test/review-probes.test.ts`](test/review-probes.test.ts) ·
+  [`test/composition.test.ts`](test/composition.test.ts)) — the 2026-09-17 review's own
+  reproductions, kept in the reporter's framing and named by their finding ids, so a test that
+  closes a finding can still be read against the report that opened it.
+
+**The nearest thing to a second implementation is not ours.** The same review reports an
+independent Python reader over a subset of the form, built for its own adapter pilot, resolving
+the same revision-bound JSON Pointers and reaching the same content as the published JavaScript
+codec. That is external evidence and it is theirs to characterize, not this register's.
 
 What does not exist: a periodic reader. The next conformance contributor is the next adopter,
-and asking one for their acceptance criteria is how this file gets its next entries.
+and asking one for their acceptance criteria is how this file gets its next entries — which is
+how the seven findings of 2026-09-17 arrived.

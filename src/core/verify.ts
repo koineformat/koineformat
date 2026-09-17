@@ -28,8 +28,28 @@ import {
 import { NODES_PATH } from "./seal.js";
 import { parseNodesJsonl } from "../sidecars.js";
 
-/** `ok` = faithful · `modified` = drifted · `error` = unreadable. */
-export type PackageStatus = "ok" | "modified" | "error";
+/**
+ * `ok` = faithful · `modified` = drifted · `incomplete` = faithful, and a body
+ * it DECLARES as required is not carried · `error` = unreadable.
+ *
+ * **`incomplete` is a separate value rather than a field beside `ok`**, and the
+ * reason is how callers actually read this: `if (insp.status === "ok") install()`
+ * is the line everybody writes, and a required-but-absent body must not pass it.
+ * A new enum value fails safe in that reading and breaks loudly in an exhaustive
+ * one; a boolean beside `ok` would have failed open in both.
+ */
+export type PackageStatus = "ok" | "modified" | "incomplete" | "error";
+
+/** A body the package references and deliberately does not carry (SPEC §3.2). */
+export interface AbsentBodyReport {
+  readonly id: string;
+  readonly path: string;
+  /** The absent body's digest, so a receiver that fetches it elsewhere can check it. */
+  readonly contentHash: string;
+  readonly reason?: string;
+  /** True when a consumer MUST NOT activate the package without it. */
+  readonly required: boolean;
+}
 
 export interface InspectOptions {
   /** Named in the error when the file map has no manifest. */
@@ -50,6 +70,16 @@ export interface PackageInspection {
   lockMatches?: boolean;
   /** The validated manifest (when readable). */
   manifest?: Manifest;
+  /**
+   * Bodies this package declares it does NOT carry (SPEC §3.2 `absent`).
+   *
+   * Empty is the common case. A non-empty list is not drift — the package said
+   * so — but a `required` entry blocks activation, and `status` is `incomplete`
+   * when one is present. Before 0.7.0 these rows did not survive `sealPackage`
+   * at all, so a sealed package silently deleted its own statement that a
+   * required piece of evidence was missing and then verified `ok`.
+   */
+  absent?: readonly AbsentBodyReport[];
 }
 
 /**
@@ -70,12 +100,22 @@ export async function inspectFiles(
 
       // WHICH file: the identity map's rows, when the package carries one.
       const nodesBytes = files.get(NODES_PATH);
-      const listing = nodesBytes
-        ? parseNodesJsonl(new TextDecoder().decode(nodesBytes)).map((row) => ({
-            path: row.path,
-            integrity: row.contentHash,
-          }))
-        : [];
+      const rows = nodesBytes ? parseNodesJsonl(new TextDecoder().decode(nodesBytes)) : [];
+      // A DECLARED absence is not a missing file. Listing it would report the
+      // package as drifted for saying out loud what it does not carry — the
+      // opposite of the honesty the declaration exists for.
+      const absent: AbsentBodyReport[] = rows
+        .filter((row) => row.absent !== undefined)
+        .map((row) => ({
+          id: row.id,
+          path: row.path,
+          contentHash: row.contentHash,
+          ...(row.absent?.reason !== undefined ? { reason: row.absent.reason } : {}),
+          required: row.absent?.required === true,
+        }));
+      const listing = rows
+        .filter((row) => row.absent === undefined)
+        .map((row) => ({ path: row.path, integrity: row.contentHash }));
       const raw = await checkContents(files, listing);
       // Sidecars are covered by the root, not listed in the map — a `.koine/*`
       // file is never "unlisted".
@@ -90,13 +130,18 @@ export async function inspectFiles(
           ? undefined
           : (await sha256HexDigest(files.get(MANIFEST_NAME)!)) === opts.expectedIntegrity;
 
-      const status: PackageStatus =
-        rootMatches && report.ok && lockMatches !== false ? "ok" : "modified";
+      const faithful = rootMatches && report.ok && lockMatches !== false;
+      const status: PackageStatus = !faithful
+        ? "modified"
+        : absent.some((body) => body.required)
+          ? "incomplete"
+          : "ok";
       return {
         status,
         manifest,
         report,
         rootMatches,
+        ...(absent.length > 0 ? { absent } : {}),
         ...(lockMatches === undefined ? {} : { lockMatches }),
       };
     }

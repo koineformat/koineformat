@@ -98,10 +98,18 @@ export {
 export { NODES_PATH, formatOf, sealPackage } from "./core/seal.js";
 export type { SealPackageOptions, SealedPackage } from "./core/seal.js";
 export { changedFiles, inspectFiles } from "./core/verify.js";
-export type { InspectOptions, PackageInspection, PackageStatus } from "./core/verify.js";
+export type { AbsentBodyReport, InspectOptions, PackageInspection, PackageStatus } from "./core/verify.js";
 
 // ── Lockfile: build a row, normalize, render ───────────────────────────────
 export { emptyLock, lockEntryFor, parseLockfile, serializeLockfile } from "./core/lock.js";
 
 // ── Path safety + size caps (U4) ───────────────────────────────────────────
 export { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, assertSafeRelPath, assertWithinCaps } from "./core/paths.js";
+
+// ── The reference import flow — the composition, in one call (SPEC §8.1, ch. 7) ──
+// `admitPackage` is the only function here that answers a COMPOSED question:
+// integrity, then required capabilities, then meaning, then completeness, then
+// origin, refusing at the first step that says no and naming it. Every other
+// export answers exactly one question and none of them may suggest more.
+export { admitPackage } from "./admit.js";
+export type { AdmissionStep, AdmissionVerdict, AdmitOptions } from "./admit.js";
