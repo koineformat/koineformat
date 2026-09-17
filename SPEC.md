@@ -1491,6 +1491,12 @@ contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and 
 
 ## Declared gaps
 
+**The working record is [`REGISTER.md`](REGISTER.md).** This list stays because a number in a
+published document must keep resolving — every gap below keeps its number forever, closed or
+not — but it is not where an open delta is worked. A hand-written list with no dates, no
+status and no receipt cannot tell a gap that is being worked from one that has been forgotten,
+and for a year it did not.
+
 1. **Edge grounding — CLOSED 2026-09-17.** *How a declared edge relates to (absent) textual
    anchors in the bodies* is answered by the **Locator** (§3.4): an endpoint carries the
    version it addressed and, optionally, one of six closed selector types. The number stays

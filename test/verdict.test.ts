@@ -1,5 +1,7 @@
 /**
- * The crossing — release 2's receipts: *the verdict*.
+ * The crossing — release 2's receipts: *the verdict*. Covers SPEC §8.1 (required
+ * capabilities), §8 (the ignorable half it does not collapse into), §7.3 (the
+ * manifest's two new declarations) and §3.2's `absent` row.
  *
  * What a receiver LEARNS, and what it may be required to honour. Until this
  * release koine's only extension shape was `x-`, ignorable by construction, so
@@ -15,7 +17,8 @@ import {
   checkCapabilities,
   parseRequiresJson,
 } from '../src/capabilities.js'
-import { validateManifest } from '../src/core/manifest.js'
+import { serializeManifest, validateManifest } from '../src/core/manifest.js'
+import { sealPackage } from '../src/core/seal.js'
 import { KoineEmitError, KoineParseError, type KoineContentHash } from '../src/types.js'
 import { sha256Hex } from '../src/sha256.js'
 
@@ -256,5 +259,48 @@ describe('the tree-grain declaration', () => {
         requires: ['NOT A TOKEN'],
       }),
     ).rejects.toThrow(KoineEmitError)
+  })
+})
+
+describe('§7.5 — a consumer that does not act on terms carries the block verbatim', () => {
+  /**
+   * The one normative rule in the terms chapter, and nothing tested it: the
+   * envelope carries `terms` through unvalidated by design (§7.3), which is
+   * exactly the condition under which "carried through" can quietly become
+   * "dropped" without anyone noticing.
+   */
+  const terms = {
+    default: 'free',
+    rules: [
+      { match: 'reports/**', payment: 'per-release', price: '12.00', currency: 'EUR',
+        payTo: '0xabc', network: 'base', asset: 'USDC' },
+    ],
+  }
+
+  it('survives validation, sealing and re-serialization with its structure intact', async () => {
+    const read = validateManifest(manifest({ terms }))
+    expect(read['terms' as keyof typeof read]).toEqual(terms as never)
+
+    const files = new Map<string, Uint8Array>([
+      ['notes.md', new TextEncoder().encode('# Notes\n')],
+      // `integrity` is required of any manifest that validates (§7.3); seal
+      // REPLACES it with the real root hash, which is the whole reason the
+      // command exists.
+      ['koine.json', new TextEncoder().encode(JSON.stringify({
+        koine: '0', name: 'priced', version: '1.0.0', integrity: `sha256:${'0'.repeat(64)}`, terms,
+      }))],
+    ])
+    const { manifest: sealed } = await sealPackage(files, { now: new Date('2026-09-17T00:00:00Z') })
+    expect((sealed as unknown as { terms: unknown }).terms).toEqual(terms)
+    // …and through the serializer a consumer writes back to disk.
+    expect(JSON.parse(serializeManifest(sealed)).terms).toEqual(terms)
+  })
+
+  it('carries a terms key this version has never heard of', async () => {
+    // The point of carry-verbatim: a future grammar must survive a consumer
+    // written before it existed.
+    const future = { ...terms, rules: [{ ...terms.rules[0], somethingNewIn2027: { tier: 'gold' } }] }
+    const read = validateManifest(manifest({ terms: future }))
+    expect(read['terms' as keyof typeof read]).toEqual(future as never)
   })
 })

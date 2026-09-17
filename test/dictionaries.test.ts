@@ -1,3 +1,4 @@
+// Covers SPEC §2.1 — the four dictionaries and their canonical file shapes.
 import { describe, expect, it } from 'bun:test'
 import {
   edgeTypePath,

@@ -1,3 +1,5 @@
+// Covers SPEC §7.2 (a package is a directory with a manifest at its root and an
+// identity map beside it) and §7.10 (path safety, size caps, named errors).
 /**
  * The eight invariants (SPEC.md §7.12, the U1–U8 tool bar) as executable
  * proof. Each `describe` block is one non-negotiable guarantee; if any goes red,

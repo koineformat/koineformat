@@ -350,3 +350,62 @@ export const packageSubject = (name: string, version: string, integrity: KoineCo
   version,
   integrity,
 })
+
+// ---------------------------------------------------------------------------
+// npub — NIP-19 bech32, because §6.4 says "npub-encoded" and means it
+// ---------------------------------------------------------------------------
+
+const BECH32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
+
+const polymod = (values: readonly number[]): number => {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+  let chk = 1
+  for (const value of values) {
+    const top = chk >> 25
+    chk = ((chk & 0x1ffffff) << 5) ^ value
+    for (let i = 0; i < 5; i++) if ((top >> i) & 1) chk ^= GEN[i] as number
+  }
+  return chk
+}
+
+const hrpExpand = (hrp: string): number[] => [
+  ...[...hrp].map((c) => c.charCodeAt(0) >> 5),
+  0,
+  ...[...hrp].map((c) => c.charCodeAt(0) & 31),
+]
+
+/** 8-bit groups → 5-bit groups, padded. The only direction an npub needs. */
+function toWords(bytes: Uint8Array): number[] {
+  const out: number[] = []
+  let acc = 0
+  let bits = 0
+  for (const byte of bytes) {
+    acc = (acc << 8) | byte
+    bits += 8
+    while (bits >= 5) {
+      bits -= 5
+      out.push((acc >> bits) & 31)
+    }
+  }
+  if (bits > 0) out.push((acc << (5 - bits)) & 31)
+  return out
+}
+
+/**
+ * Encode an x-only public key as an `npub1…` (NIP-19 / BIP-173 bech32).
+ *
+ * §6.4 chose npub so that *"existing ecosystem tooling encodes, decodes and
+ * verifies them"*, and a conformance vector carrying a made-up npub would teach
+ * every implementer that reads it the wrong encoding — which is a worse defect
+ * in a standard than in a library.
+ *
+ * The npub is a rendering of the same key the payload carries as hex; a
+ * verifier uses `pubkey`, never this. It is here so the artifact is true.
+ */
+export function encodeNpub(publicKey: Uint8Array): string {
+  const hrp = 'npub'
+  const words = toWords(publicKey)
+  const checksum = polymod([...hrpExpand(hrp), ...words, 0, 0, 0, 0, 0, 0]) ^ 1
+  const tail = Array.from({ length: 6 }, (_, i) => (checksum >> (5 * (5 - i))) & 31)
+  return `${hrp}1${[...words, ...tail].map((w) => BECH32[w]).join('')}`
+}

@@ -1,6 +1,6 @@
 {
   "name": "koineformat",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Definitions, types, decisions and their history as ordinary files beside your documents \u2014 so knowledge can leave home and still be understood, checked, and trusted.",
   "homepage": "https://koineformat.org",
   "type": "module",
@@ -18,7 +18,8 @@
   },
   "files": [
     "dist",
-    "SPEC.md"
+    "SPEC.md",
+    "REGISTER.md"
   ],
   "engines": {
     "node": ">=18"

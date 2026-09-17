@@ -55,7 +55,7 @@ is a worked proposal against it — the day-one gesture as a standalone whole it
 `verifyKoineTree` — the TypeScript sibling of `tools/verify.py` above.
 
 ```
-npm install koineformat     # not yet published — it arrives with the founding
+npm install koineformat
 ```
 
 ```ts
@@ -93,8 +93,11 @@ and what the product does cannot drift apart, because they are one build.
 
 ## Status
 
-**v0 DRAFT.** Nothing here is published or founded; the spec is being extracted from a working
-implementation, not invented ahead of one.
+**v0 DRAFT, published.** The package is on npm and the spec is being extracted from a working
+implementation, rather than invented ahead of one. Draft means the chapters still move; it has
+never meant the artifact is unreachable — and for three weeks this page said the opposite of
+what the registry served, which a stranger found in an hour and nothing here was looking for.
+The claim is now checked by this repository's own suite (`test/guards.test.ts`).
 
 ---
 

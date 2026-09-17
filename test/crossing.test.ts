@@ -1,5 +1,6 @@
 /**
- * The crossing — release 1's receipts.
+ * The crossing — release 1's receipts. Covers SPEC §3.2 (the identity map and
+ * the asserted graph), §3.4 (the Locator), §3.5 (the four verdicts) and §4.
  *
  * Each clause below is a law the form states about itself and could not survive
  * its own roundtrip. They are written as COMPOSITIONS on purpose: the suite

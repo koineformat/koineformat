@@ -24,7 +24,7 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Test
+      - name: Test — the suite, the three structural guards and the conformance criteria
         run: bun test
 
       - name: Reference verifier — the example repo verifies with no dependencies

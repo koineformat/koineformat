@@ -1,17 +1,23 @@
 {
-  "note": "Conformance vectors for SPEC chapter 6 — the seal. Each case names the bytes, the subject a verifier must recompute from content, and the expected verdict. An implementation is conformant when it reproduces every verdict WITHOUT reading this note.",
-  "payloadTypes": {
-    "seal": "application/vnd.koine.seal+json",
-    "delegation": "application/vnd.koine.delegation+json"
+  "note": "Conformance vectors for SPEC chapter 6 — the seal. Each case names the envelope bytes, the subject a verifier must recompute FROM CONTENT, and the expected verdict. An implementation is conformant when it reproduces every verdict. The keys are deterministic so the file can be regenerated; they are test keys and secure nothing.",
+  "spec": {
+    "payloadTypes": {
+      "seal": "application/vnd.koine.seal+json",
+      "delegation": "application/vnd.koine.delegation+json"
+    },
+    "message": "sha256(PAE(payloadType, payload)) — DSSE 1.0.2 PAE, 32 bytes",
+    "scheme": "BIP-340 Schnorr over secp256k1; public keys x-only hex, rendered as NIP-19 npub"
   },
   "keys": {
     "human": {
       "privateKey": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
-      "pubkey": "84bf7562262bbd6940085748f3be6afa52ae317155181ece31b66351ccffa4b0"
+      "pubkey": "84bf7562262bbd6940085748f3be6afa52ae317155181ece31b66351ccffa4b0",
+      "npub": "npub1sjlh2c3x9w7kjsqg2ay080n2lff2uvt325vpan33ke34rn8l5jcqawh57m"
     },
     "agent": {
       "privateKey": "0d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6",
-      "pubkey": "0923de1aebf3253a85f1d46734983ec3e44846d86775b36aa3311767e78e3160"
+      "pubkey": "0923de1aebf3253a85f1d46734983ec3e44846d86775b36aa3311767e78e3160",
+      "npub": "npub1py3auxht7vjn4p0363nnfxp7c0jys3kcva6mx64rxytk0euwx9sq9adavv"
     }
   },
   "cases": [
@@ -19,11 +25,11 @@
       "name": "a human-authored chain-head seal verifies",
       "envelope": {
         "payloadType": "application/vnd.koine.seal+json",
-        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6Ijg0YmY3NTYyMjYyYmJkNjk0MDA4NTc0OGYzYmU2YWZhNTJhZTMxNzE1NTE4MWVjZTMxYjY2MzUxY2NmZmE0YjAiLCJucHViIjoibnB1YjE4NGJmNzU2MjI2MmJiZDY5IiwiYXV0aG9yIjoiYWN0b3I6dXNlcjpvd25lciIsInNpZ25lZEF0IjoiMjAyNi0wOS0xN1QxMjowMDowMFoiLCJzdWJqZWN0Ijp7ImdyYWluIjoiY2hhaW4taGVhZCIsImhhc2giOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn19",
+        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6Ijg0YmY3NTYyMjYyYmJkNjk0MDA4NTc0OGYzYmU2YWZhNTJhZTMxNzE1NTE4MWVjZTMxYjY2MzUxY2NmZmE0YjAiLCJucHViIjoibnB1YjFzamxoMmMzeDl3N2tqc3FnMmF5MDgwbjJsZmYydXZ0MzI1dnBhbjMza2UzNHJuOGw1amNxYXdoNTdtIiwiYXV0aG9yIjoiYWN0b3I6dXNlcjpvd25lciIsInNpZ25lZEF0IjoiMjAyNi0wOS0xN1QxMjowMDowMFoiLCJzdWJqZWN0Ijp7ImdyYWluIjoiY2hhaW4taGVhZCIsImhhc2giOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn19",
         "signatures": [
           {
-            "sig": "H9BbaxPwemDtRXwBD2b0K0lcXyosLZ7N3TTvD4o397iFYOqIBCl7OFv94bdKcplTij/zadNG/EDj2+cQjplbBg==",
-            "keyid": "npub184bf7562262bbd69"
+            "sig": "4K1p7zkXbuGbxABNbVfoMgSu+xEQ8OgYCnzYulbs0UHtS+29UXae0Li5mwzUehjui/W5EmFOy0x/ZeVgjOO9tQ==",
+            "keyid": "npub1sjlh2c3x9w7kjsqg2ay080n2lff2uvt325vpan33ke34rn8l5jcqawh57m"
           }
         ]
       },
@@ -39,11 +45,11 @@
       "name": "an agent-authored file seal verifies through its delegation certificate",
       "envelope": {
         "payloadType": "application/vnd.koine.seal+json",
-        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6IjA5MjNkZTFhZWJmMzI1M2E4NWYxZDQ2NzM0OTgzZWMzZTQ0ODQ2ZDg2Nzc1YjM2YWEzMzExNzY3ZTc4ZTMxNjAiLCJucHViIjoibnB1YjEwOTIzZGUxYWViZjMyNTNhIiwiYXV0aG9yIjoiYWN0b3I6YWdlbnQ6bm9lIiwic2lnbmVkQXQiOiIyMDI2LTA5LTE3VDEyOjA1OjAwWiIsInN1YmplY3QiOnsiZ3JhaW4iOiJmaWxlIiwibm9kZUlkIjoibi1kMjc3MjdhZGNlNmMiLCJwYXRoIjoiZGVmaW5pdGlvbnMvYWN0aXZlLW1lbWJlci5tZCIsImNvbnRlbnRIYXNoIjoic2hhMjU2Ojg2YWYxYzI1MThiN2I4OGQ4NTE3ZmU4MzFhZTFiZWJhNjQ0NzIxZGNiODc5NzUwMDY2Y2Y2NmM3NzIwZGE1ZDkifSwiZGVsZWdhdGlvbiI6eyJwYXlsb2FkVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5rb2luZS5kZWxlZ2F0aW9uK2pzb24iLCJwYXlsb2FkIjoiZXlKcmIybHVaU0k2SWpBaUxDSnJhVzVrSWpvaWEyOXBibVV2WkdWc1pXZGhkR2x2YmtCMk1DSXNJbTFsZEdodlpDSTZJbUpwY0RNME1DSXNJbUZuWlc1MElqb2lZV04wYjNJNllXZGxiblE2Ym05bElpd2lZV2RsYm5SUWRXSnJaWGtpT2lJd09USXpaR1V4WVdWaVpqTXlOVE5oT0RWbU1XUTBOamN6TkRrNE0yVmpNMlUwTkRnME5tUTROamMzTldJek5tRmhNek14TVRjMk4yVTNPR1V6TVRZd0lpd2lZbmtpT2lKaFkzUnZjanAxYzJWeU9tOTNibVZ5SWl3aVlubFFkV0pyWlhraU9pSTROR0ptTnpVMk1qSTJNbUppWkRZNU5EQXdPRFUzTkRobU0ySmxObUZtWVRVeVlXVXpNVGN4TlRVeE9ERmxZMlV6TVdJMk5qTTFNV05qWm1aaE5HSXdJaXdpWW5sT2NIVmlJam9pYm5CMVlqRTROR0ptTnpVMk1qSTJNbUppWkRZNUlpd2lhWE56ZFdWa1FYUWlPaUl5TURJMkxUQTVMVEF4VkRBd09qQXdPakF3V2lKOSIsInNpZ25hdHVyZXMiOlt7InNpZyI6IlN0a1kwTlZ3dnJGQXBYVHZXZzBjZ2FNakh1aTNOMDZkR0RUUzNYRVN2RFIxRm9CMEFHSDh6NlR0cFU0TVpNVHl0SVRFZ1dRa2JpdG5mUHJDWFpoOUV3PT0iLCJrZXlpZCI6Im5wdWIxODRiZjc1NjIyNjJiYmQ2OSJ9XX19",
+        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6IjA5MjNkZTFhZWJmMzI1M2E4NWYxZDQ2NzM0OTgzZWMzZTQ0ODQ2ZDg2Nzc1YjM2YWEzMzExNzY3ZTc4ZTMxNjAiLCJucHViIjoibnB1YjFweTNhdXhodDd2am40cDAzNjNubmZ4cDdjMGp5czNrY3ZhNm14NjRyeHl0azBldXd4OXNxOWFkYXZ2IiwiYXV0aG9yIjoiYWN0b3I6YWdlbnQ6bm9lIiwic2lnbmVkQXQiOiIyMDI2LTA5LTE3VDEyOjA1OjAwWiIsInN1YmplY3QiOnsiZ3JhaW4iOiJmaWxlIiwibm9kZUlkIjoibi1kMjc3MjdhZGNlNmMiLCJwYXRoIjoiZGVmaW5pdGlvbnMvYWN0aXZlLW1lbWJlci5tZCIsImNvbnRlbnRIYXNoIjoic2hhMjU2Ojg2YWYxYzI1MThiN2I4OGQ4NTE3ZmU4MzFhZTFiZWJhNjQ0NzIxZGNiODc5NzUwMDY2Y2Y2NmM3NzIwZGE1ZDkifSwiZGVsZWdhdGlvbiI6eyJwYXlsb2FkVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5rb2luZS5kZWxlZ2F0aW9uK2pzb24iLCJwYXlsb2FkIjoiZXlKcmIybHVaU0k2SWpBaUxDSnJhVzVrSWpvaWEyOXBibVV2WkdWc1pXZGhkR2x2YmtCMk1DSXNJbTFsZEdodlpDSTZJbUpwY0RNME1DSXNJbUZuWlc1MElqb2lZV04wYjNJNllXZGxiblE2Ym05bElpd2lZV2RsYm5SUWRXSnJaWGtpT2lJd09USXpaR1V4WVdWaVpqTXlOVE5oT0RWbU1XUTBOamN6TkRrNE0yVmpNMlUwTkRnME5tUTROamMzTldJek5tRmhNek14TVRjMk4yVTNPR1V6TVRZd0lpd2lZbmtpT2lKaFkzUnZjanAxYzJWeU9tOTNibVZ5SWl3aVlubFFkV0pyWlhraU9pSTROR0ptTnpVMk1qSTJNbUppWkRZNU5EQXdPRFUzTkRobU0ySmxObUZtWVRVeVlXVXpNVGN4TlRVeE9ERmxZMlV6TVdJMk5qTTFNV05qWm1aaE5HSXdJaXdpWW5sT2NIVmlJam9pYm5CMVlqRnphbXhvTW1NemVEbDNOMnRxYzNGbk1tRjVNRGd3YmpKc1ptWXlkWFowTXpJMWRuQmhiak16YTJVek5ISnVPR3cxYW1OeFlYZG9OVGR0SWl3aWFYTnpkV1ZrUVhRaU9pSXlNREkyTFRBNUxUQXhWREF3T2pBd09qQXdXaUo5Iiwic2lnbmF0dXJlcyI6W3sic2lnIjoiRDhBSjhKdEpSYmU0Z05ROG83aVFKNTZ3SzhuOXVZajNtcjhpQ3QyUVpWSGpjdGZYaTdhSTVITnFpNUVLd0pkWlpTNlVPeFdMdXFDK1VNRzgvWlJnRHc9PSIsImtleWlkIjoibnB1YjFzamxoMmMzeDl3N2tqc3FnMmF5MDgwbjJsZmYydXZ0MzI1dnBhbjMza2UzNHJuOGw1amNxYXdoNTdtIn1dfX0=",
         "signatures": [
           {
-            "sig": "1AGodlx5Y8i/WR+1q7xjw7TAyHmhzc2IBEXJagwpCTZWQ6RA/o0mzPWPtzjAa+mXd+JKCyIOf8Uzo8vdMz6F9A==",
-            "keyid": "npub10923de1aebf3253a"
+            "sig": "nvh9qYE+7QEUtbD+aOZY81wktGth4Jbqu4BrXYBpWQN1UUKHJy0vqqbb6hUSIInFzEKDGKfNzC43sAdL/RAj9w==",
+            "keyid": "npub1py3auxht7vjn4p0363nnfxp7c0jys3kcva6mx64rxytk0euwx9sq9adavv"
           }
         ]
       },
@@ -61,11 +67,11 @@
       "name": "a seal checked against a DIFFERENT subject is refused",
       "envelope": {
         "payloadType": "application/vnd.koine.seal+json",
-        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6Ijg0YmY3NTYyMjYyYmJkNjk0MDA4NTc0OGYzYmU2YWZhNTJhZTMxNzE1NTE4MWVjZTMxYjY2MzUxY2NmZmE0YjAiLCJucHViIjoibnB1YjE4NGJmNzU2MjI2MmJiZDY5IiwiYXV0aG9yIjoiYWN0b3I6dXNlcjpvd25lciIsInNpZ25lZEF0IjoiMjAyNi0wOS0xN1QxMjowMDowMFoiLCJzdWJqZWN0Ijp7ImdyYWluIjoiY2hhaW4taGVhZCIsImhhc2giOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn19",
+        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6Ijg0YmY3NTYyMjYyYmJkNjk0MDA4NTc0OGYzYmU2YWZhNTJhZTMxNzE1NTE4MWVjZTMxYjY2MzUxY2NmZmE0YjAiLCJucHViIjoibnB1YjFzamxoMmMzeDl3N2tqc3FnMmF5MDgwbjJsZmYydXZ0MzI1dnBhbjMza2UzNHJuOGw1amNxYXdoNTdtIiwiYXV0aG9yIjoiYWN0b3I6dXNlcjpvd25lciIsInNpZ25lZEF0IjoiMjAyNi0wOS0xN1QxMjowMDowMFoiLCJzdWJqZWN0Ijp7ImdyYWluIjoiY2hhaW4taGVhZCIsImhhc2giOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn19",
         "signatures": [
           {
-            "sig": "H9BbaxPwemDtRXwBD2b0K0lcXyosLZ7N3TTvD4o397iFYOqIBCl7OFv94bdKcplTij/zadNG/EDj2+cQjplbBg==",
-            "keyid": "npub184bf7562262bbd69"
+            "sig": "4K1p7zkXbuGbxABNbVfoMgSu+xEQ8OgYCnzYulbs0UHtS+29UXae0Li5mwzUehjui/W5EmFOy0x/ZeVgjOO9tQ==",
+            "keyid": "npub1sjlh2c3x9w7kjsqg2ay080n2lff2uvt325vpan33ke34rn8l5jcqawh57m"
           }
         ]
       },
@@ -76,6 +82,50 @@
       "expect": {
         "valid": false,
         "reason": "subject-mismatch"
+      }
+    },
+    {
+      "name": "a delegation certificate the named human did not sign is refused",
+      "envelope": {
+        "payloadType": "application/vnd.koine.seal+json",
+        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6IjA5MjNkZTFhZWJmMzI1M2E4NWYxZDQ2NzM0OTgzZWMzZTQ0ODQ2ZDg2Nzc1YjM2YWEzMzExNzY3ZTc4ZTMxNjAiLCJucHViIjoibnB1YjFweTNhdXhodDd2am40cDAzNjNubmZ4cDdjMGp5czNrY3ZhNm14NjRyeHl0azBldXd4OXNxOWFkYXZ2IiwiYXV0aG9yIjoiYWN0b3I6YWdlbnQ6bm9lIiwic2lnbmVkQXQiOiIyMDI2LTA5LTE3VDEyOjA1OjAwWiIsInN1YmplY3QiOnsiZ3JhaW4iOiJmaWxlIiwibm9kZUlkIjoibi1kMjc3MjdhZGNlNmMiLCJwYXRoIjoiZGVmaW5pdGlvbnMvYWN0aXZlLW1lbWJlci5tZCIsImNvbnRlbnRIYXNoIjoic2hhMjU2Ojg2YWYxYzI1MThiN2I4OGQ4NTE3ZmU4MzFhZTFiZWJhNjQ0NzIxZGNiODc5NzUwMDY2Y2Y2NmM3NzIwZGE1ZDkifSwiZGVsZWdhdGlvbiI6eyJwYXlsb2FkVHlwZSI6ImFwcGxpY2F0aW9uL3ZuZC5rb2luZS5kZWxlZ2F0aW9uK2pzb24iLCJwYXlsb2FkIjoiZXlKcmIybHVaU0k2SWpBaUxDSnJhVzVrSWpvaWEyOXBibVV2WkdWc1pXZGhkR2x2YmtCMk1DSXNJbTFsZEdodlpDSTZJbUpwY0RNME1DSXNJbUZuWlc1MElqb2lZV04wYjNJNllXZGxiblE2Ym05bElpd2lZV2RsYm5SUWRXSnJaWGtpT2lJd09USXpaR1V4WVdWaVpqTXlOVE5oT0RWbU1XUTBOamN6TkRrNE0yVmpNMlUwTkRnME5tUTROamMzTldJek5tRmhNek14TVRjMk4yVTNPR1V6TVRZd0lpd2lZbmtpT2lKaFkzUnZjanAxYzJWeU9tOTNibVZ5SWl3aVlubFFkV0pyWlhraU9pSTROR0ptTnpVMk1qSTJNbUppWkRZNU5EQXdPRFUzTkRobU0ySmxObUZtWVRVeVlXVXpNVGN4TlRVeE9ERmxZMlV6TVdJMk5qTTFNV05qWm1aaE5HSXdJaXdpWW5sT2NIVmlJam9pYm5CMVlqRnphbXhvTW1NemVEbDNOMnRxYzNGbk1tRjVNRGd3YmpKc1ptWXlkWFowTXpJMWRuQmhiak16YTJVek5ISnVPR3cxYW1OeFlYZG9OVGR0SWl3aWFYTnpkV1ZrUVhRaU9pSXlNREkyTFRBNUxUQXhWREF3T2pBd09qQXdXaUo5Iiwic2lnbmF0dXJlcyI6W3sic2lnIjoiRzVQR0RVTHZuV2ZJYUJLMW1qdFBXWWYwM2RINC8vRGc3bUlFUk94S0p3TGgwN0s4bEhxRzBkQUY2TEZoZWNyTVVQVWU1VGlGNytjNXp2WVpYOUlqQ1E9PSIsImtleWlkIjoibnB1YjFzamxoMmMzeDl3N2tqc3FnMmF5MDgwbjJsZmYydXZ0MzI1dnBhbjMza2UzNHJuOGw1amNxYXdoNTdtIn1dfX0=",
+        "signatures": [
+          {
+            "sig": "s8NIb63PuSDrb/4usrP9664prZKlJ1lpmoooYJmH9BkZHpJqe4D7cC/NNh3SLKIvvtP3krAV/5vZBU5h0l/Xag==",
+            "keyid": "npub1py3auxht7vjn4p0363nnfxp7c0jys3kcva6mx64rxytk0euwx9sq9adavv"
+          }
+        ]
+      },
+      "subject": {
+        "grain": "file",
+        "nodeId": "n-d27727adce6c",
+        "path": "definitions/active-member.md",
+        "contentHash": "sha256:86af1c2518b7b88d8517fe831ae1beba644721dcb879750066cf66c7720da5d9"
+      },
+      "expect": {
+        "valid": false,
+        "reason": "bad-delegation"
+      }
+    },
+    {
+      "name": "a seal whose payload bytes were altered after signing is refused",
+      "envelope": {
+        "payloadType": "application/vnd.koine.seal+json",
+        "payload": "eyJrb2luZSI6IjAiLCJraW5kIjoia29pbmUvc2VhbEB2MCIsIm1ldGhvZCI6ImJpcDM0MCIsInB1YmtleSI6Ijg0YmY3NTYyMjYyYmJkNjk0MDA4NTc0OGYzYmU2YWZhNTJhZTMxNzE1NTE4MWVjZTMxYjY2MzUxY2NmZmE0YjAiLCJucHViIjoibnB1YjFzamxoMmMzeDl3N2tqc3FnMmF5MDgwbjJsZmYydXZ0MzI1dnBhbjMza2UzNHJuOGw1amNxYXdoNTdtIiwiYXV0aG9yIjoiYWN0b3I6dXNlcjpzb21lb25lLWVsc2UiLCJzaWduZWRBdCI6IjIwMjYtMDktMTdUMTI6MDA6MDBaIiwic3ViamVjdCI6eyJncmFpbiI6ImNoYWluLWhlYWQiLCJoYXNoIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSJ9fQ==",
+        "signatures": [
+          {
+            "sig": "4K1p7zkXbuGbxABNbVfoMgSu+xEQ8OgYCnzYulbs0UHtS+29UXae0Li5mwzUehjui/W5EmFOy0x/ZeVgjOO9tQ==",
+            "keyid": "npub1sjlh2c3x9w7kjsqg2ay080n2lff2uvt325vpan33ke34rn8l5jcqawh57m"
+          }
+        ]
+      },
+      "subject": {
+        "grain": "chain-head",
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expect": {
+        "valid": false,
+        "reason": "bad-signature"
       }
     }
   ]

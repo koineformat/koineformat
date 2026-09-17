@@ -26,6 +26,7 @@ import {
   pae,
   readSealPayload,
   sealEnvelope,
+  encodeNpub,
   sealMessage,
   toBase64,
   verifySeal,
@@ -267,3 +268,20 @@ describe('base64 and the message, without a dependency or a Node builtin', () =>
     expect((await sealMessage(envelope)).length).toBe(32)
   })
 })
+
+describe('npub — §6.4 chose it so existing tooling resolves the key', () => {
+  it('matches the published NIP-19 test vector', () => {
+    const hexKey = '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d'
+    const bytes = new Uint8Array((hexKey.match(/../g) as string[]).map((h) => Number.parseInt(h, 16)))
+    expect(encodeNpub(bytes)).toBe('npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6')
+  })
+
+  it('renders the same key the payload carries as hex — a verifier uses the hex, never this', async () => {
+    const envelope = await sealEnvelope(payload(), SEAL_PAYLOAD_TYPE, sign, KEY)
+    const inner = readSealPayload<KoineSealPayload>(envelope)
+    expect(encodeNpub(hexToBytes(inner.pubkey))).toBe(encodeNpub(PUB))
+  })
+})
+
+const hexToBytes = (h: string): Uint8Array =>
+  new Uint8Array((h.match(/../g) as string[]).map((x) => Number.parseInt(x, 16)))
