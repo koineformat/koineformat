@@ -457,14 +457,24 @@ export async function verifyKoineTree(files: ReadonlyMap<string, Uint8Array | st
     tree = parseKoineTree(files)
   } catch (error) {
     const problem = error instanceof Error ? error.message : String(error)
-    // The tree does not parse, so no question below can be asked of it — and
+    // The tree does not parse, so no question BELOW can be asked of it — and
     // saying `pass` to any of them would be the exact dishonesty this shape
     // exists to end.
+    //
+    // Integrity is not below: §3.5 asks whether the tree's own record is intact
+    // and readable, and an unreadable sidecar fails exactly that. Found in the
+    // fifth round by running B15's shape — *does the account match what was
+    // actually done?* — against this function instead of `admitPackage`. The
+    // docblock said nothing could be asked and the code answered one of them;
+    // the SPEC's wording for `integrity` was simply narrower than the design,
+    // and §3.5 now states the parse half it always enforced. The problem text
+    // says WHICH half failed, so a caller never reads a syntax error as byte
+    // tampering — two different failures with two different remedies.
     const unknown: KoineVerdict = { status: 'not-established', problems: ['the tree does not parse'] }
     return {
       ok: false,
       problems: [problem],
-      integrity: { status: 'fail', problems: [problem] },
+      integrity: { status: 'fail', problems: [`the tree's own record does not parse — ${problem}`] },
       schema: unknown,
       references: unknown,
       origin: unknown,

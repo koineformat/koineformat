@@ -118,12 +118,25 @@ export interface AdmissionVerdict {
   /** The seal's own verdict, when one was offered. */
   readonly seal?: SealVerdict
   /**
-   * Steps that did NOT run, because an earlier one refused and running them
-   * would have produced an opinion the reader was not entitled to.
+   * Steps this result carries NO ANSWER for — for either of two reasons: an
+   * earlier step refused and running them would have produced an opinion the
+   * reader was not entitled to, or the package gave them no subject (a package
+   * with no koine tree cannot be asked whether its bodies satisfy their types).
    *
-   * Present only when something was skipped. It exists so that no caller infers
-   * a pass from an absence: a verdict that simply omitted the later steps would
-   * read, at every call site, exactly like one where they passed.
+   * Present only when something is unanswered. It exists so that no caller
+   * infers a pass from an absence: a verdict that simply omitted the later steps
+   * would read, at every call site, exactly like one where they passed.
+   *
+   * **B15, fifth round — and the half the fourth round's repair left open.**
+   * Deriving `notRun` by subtraction closed the *overwrite* half and kept a
+   * wrong universe: `ran` was appended where each BRANCH was reached, while the
+   * answers to `schema`, `references` and `completeness` are produced by two
+   * computations that run whole. So a package failing schema reported
+   * `notRun: ["references", …]` while the same object carried
+   * `tree.references.status: "fail"` with the missing edge target named. A
+   * derivation is only as true as the set it subtracts from. `ran` now records
+   * where the ANSWER was computed, so a step in this list has no answer anywhere
+   * in the result — which is the only thing the field can honestly mean.
    */
   readonly notRun?: readonly AdmissionStep[]
 }
@@ -195,6 +208,10 @@ export async function admitPackage(
     origin = NOT_CHECKED('the package did not parse')
     return finish()
   }
+  // ONE read answered three questions, so three steps are answered — whatever
+  // this flow does next. `inspection.absent` is computed independently of
+  // `status`, which is why completeness belongs here and not at its branch.
+  ran.push('integrity', 'completeness')
 
   // A malformed sidecar is a verdict, not an exception: a thrown parse error has
   // no step and no reasons, and every catch site invents a meaning for it.
@@ -210,7 +227,6 @@ export async function admitPackage(
     }
   }
 
-  ran.push('integrity')
   if (inspection.status === 'modified') {
     refuse('integrity', [
       'the package does not match its own listing',
@@ -239,14 +255,20 @@ export async function admitPackage(
   }
 
   // ── 3 & 4. the meaning layer, when the archive carried one ─────────────────
-  if (hasTree) tree = await verifyKoineTree(files)
-  ran.push('schema')
+  //
+  // ONE computation, three verdicts, all of them reported (§3.5). The two steps
+  // below name which verdict REFUSED; neither can be skipped by the other, and
+  // a reader receives both answers whenever this call ran. A package with no
+  // tree gives them no subject at all — they are unanswered then, not passed.
+  if (hasTree) {
+    tree = await verifyKoineTree(files)
+    ran.push('schema', 'references')
+  }
   if (tree?.schema.status === 'fail') {
     refuse('schema', tree.schema.problems)
     origin = NOT_CHECKED('the bodies do not satisfy their declared types, so nothing downstream was checked')
     return finish()
   }
-  ran.push('references')
   if (tree?.integrity.status === 'fail' || tree?.references.status === 'fail') {
     refuse('references', [...tree.integrity.problems, ...tree.references.problems])
     origin = NOT_CHECKED('the tree names something it does not hold, so nothing downstream was checked')
@@ -254,7 +276,8 @@ export async function admitPackage(
   }
 
   // ── 5. what the package says it does not carry ─────────────────────────────
-  ran.push('completeness')
+  // Answered by the read at step 1 and already in `ran`; this is the branch that
+  // acts on it, never the place the answer is produced.
   if (inspection.status === 'incomplete') {
     refuse('completeness', (inspection.absent ?? [])
       .filter(body => body.required)

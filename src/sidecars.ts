@@ -17,6 +17,7 @@ import { canonicalLocator, parseLocator } from './locator.js'
 import { isValidity } from './shape.js'
 import { isKoineActor } from './types.js'
 import {
+  KoineEmitError,
   KoineParseError,
   type KoineChainHeader,
   type KoineChainLink,
@@ -82,6 +83,22 @@ function requireNumber(file: string, index: number, row: Record<string, unknown>
 function requireActor(file: string, index: number, row: Record<string, unknown>): string {
   const value = requireString(file, index, row, 'actor')
   if (!isKoineActor(value)) {
+    throw new KoineParseError(file, index + 1, `"actor": "${value}" is not actor:(user|agent):<id> (SPEC §3.3)`)
+  }
+  return value
+}
+
+/**
+ * An actor field that may be absent — an edge's `actor` (§3.2).
+ *
+ * Absent is legal (most edges assert themselves); present-and-malformed is not,
+ * and is the same refusal a commit's actor gets. Two grains of one grammar do
+ * not get two strictnesses; that was the whole of Q3, and this is the field Q3
+ * did not reach.
+ */
+function optionalActor(file: string, index: number, row: Record<string, unknown>): string | undefined {
+  const value = optionalString(file, index, row, 'actor')
+  if (value !== undefined && !isKoineActor(value)) {
     throw new KoineParseError(file, index + 1, `"actor": "${value}" is not actor:(user|agent):<id> (SPEC §3.3)`)
   }
   return value
@@ -194,10 +211,44 @@ function parseAbsent(file: string, line: number, raw: unknown): KoineAbsentBody 
 // edges.jsonl
 // ---------------------------------------------------------------------------
 
+/**
+ * The WRITER half of the actor grammar — and the half Q3 forgot entirely.
+ *
+ * Measured after the fifth review round, with the population enumerated from the
+ * types instead of from memory: `emitCommitsJsonl` and `emitKoineTree` would
+ * happily write `actor: "bob"`, which `parseCommitsJsonl` then refuses. The
+ * codec could emit a tree it could not read — and the roundtrip is the only
+ * place that showed it.
+ *
+ * Refusing at READ protects this implementation from other people's artifacts.
+ * Refusing at WRITE protects other people from ours, and for a standard's
+ * reference implementation that is the more important direction. §3.4 already
+ * knew this for the Locator (*an emitter MUST refuse a Locator whose
+ * `contentHash` does not match*); the actor field simply never got the same
+ * sentence.
+ *
+ * Returns `{}` so it can be spread at the head of the emitted object — the check
+ * runs where the bytes are written, not at a call site that can be forgotten.
+ */
+function refuseBadActor(value: string | undefined, where: string, optional: boolean): Record<string, never> {
+  if (value === undefined) {
+    if (optional) return {}
+    throw new KoineEmitError(`${where}: "actor" is required and absent (SPEC §3.3)`)
+  }
+  if (!isKoineActor(value)) {
+    throw new KoineEmitError(
+      `${where}: "actor": "${value}" is not actor:(user|agent):<id> — emitting it would write a tree `
+      + 'this codec refuses to read (SPEC §3.3)',
+    )
+  }
+  return {}
+}
+
 export function emitEdgesJsonl(entries: readonly KoineEdgeEntry[]): string {
   return entries
     .map((e) =>
       jsonLine({
+        ...refuseBadActor(e.actor, `edge ${e.from} -> ${e.to}`, true),
         from: e.from,
         to: e.to,
         type: e.type,
@@ -229,7 +280,12 @@ export function parseEdgesJsonl(text: string): KoineEdgeEntry[] {
       type: requireString(file, i, row, 'type'),
       ...(fromLocator !== undefined ? { fromLocator: parseLocator(file, i + 1, fromLocator) } : {}),
       ...(toLocator !== undefined ? { toLocator: parseLocator(file, i + 1, toLocator) } : {}),
-      ...optional('actor', optionalString(file, i, row, 'actor')),
+      // §3.2 · §3.3: the SAME grammar as a commit's actor. It was
+      // `optionalString`, so `bob` and `actor:user:` crossed reader, tree verify
+      // and admission untouched — reported as B16 by the fifth review round, and
+      // it is the field the Q3 repair missed because that query enumerated the
+      // sites it remembered rather than the FIELDS the rule governs.
+      ...optional('actor', optionalActor(file, i, row)),
       ...optional('when', optionalString(file, i, row, 'when')),
       ...optional('validFrom', optionalString(file, i, row, 'validFrom')),
       ...optional('validTo', optionalString(file, i, row, 'validTo')),
@@ -250,6 +306,7 @@ export function emitCommitsJsonl(commits: readonly KoineCommit[]): string {
   return commits
     .map((c) =>
       jsonLine({
+        ...refuseBadActor(c.actor, `commit ${String(c.seq)}`, false),
         seq: c.seq,
         actor: c.actor,
         what: c.what,

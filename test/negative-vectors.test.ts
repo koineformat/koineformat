@@ -223,7 +223,12 @@ describe('class 2 — two representations of one fact, held together mechanicall
   it('a refusal names what it did NOT check, so no pass is inferred from an absence', async () => {
     const files = await packageNamed('alpha', { requires: ['locator'] })
     const verdict = await admitPackage(files, { implements: [] })
-    expect(verdict.notRun).toEqual(['schema', 'references', 'completeness', 'identity', 'origin'])
+    // **Corrected in the fifth round (B15).** This listed `completeness` too —
+    // and the read at step 1 had already answered it: `inspection.absent` is
+    // computed independently of `status` and rides in `package`. `notRun` says
+    // the result carries NO ANSWER; whether an answer may be ACTED ON is what
+    // `refusedAt` and the stop rule say. Two facts, two fields.
+    expect(verdict.notRun).toEqual(['schema', 'references', 'identity', 'origin'])
   })
 })
 
@@ -297,7 +302,7 @@ describe('round 4 — the repairs of the repairs, and one the review did not rep
     files.set('alpha.md', enc.encode('# tampered\n')) // integrity fails FIRST
     const verdict = await admitPackage(files, { implements: [] })
     expect(verdict.refusedAt).toBe('integrity')
-    expect(verdict.notRun).toEqual(['capabilities', 'schema', 'references', 'completeness', 'identity', 'origin'])
+    expect(verdict.notRun).toEqual(['capabilities', 'schema', 'references', 'identity', 'origin'])
   })
 
   it('B15 — a refused step never reaches the curve operation', async () => {
@@ -318,7 +323,11 @@ describe('round 4 — the repairs of the repairs, and one the review did not rep
 })
 
 describe('the self-audit — found by running the reported shapes as queries, not by a report', () => {
-  it('ONE actor grammar, at all three grains', async () => {
+  // The title said "at all three grains" and the form has FOUR actor fields;
+  // the fifth review round found the one this query never looked at. Kept as
+  // the record of the repair, renamed so it stops asserting the miscount — the
+  // whole-population test is `one grammar, every field, BOTH halves` below.
+  it('ONE actor grammar — the three grains this query reached', async () => {
     const { isKoineActor } = await import('../src/types.js')
     const { parseCommitsJsonl } = await import('../src/sidecars.js')
     const { validateProposalEnvelope } = await import('../src/proposal.js')
@@ -362,5 +371,124 @@ describe('the self-audit — found by running the reported shapes as queries, no
     // it is named rather than default. Handing it the locator's own hash makes
     // every pointer resolve, always, and nothing says so.
     expect(resolveLocatorAgainst({ contentHash: wrong }, body, wrong).status).toBe('resolved')
+  })
+})
+
+describe('round 5 — the account of a refusal, and the population of a rule', () => {
+  const RECORD = {
+    name: 'metric-definition',
+    schema: {
+      type: 'object',
+      properties: { kind: { const: 'metric-definition' }, unit: { enum: ['count', 'rate'] }, denominator: { type: 'string' } },
+      required: ['kind'],
+      if: { properties: { unit: { const: 'rate' } }, required: ['unit'] },
+      then: { required: ['denominator'] },
+    },
+  }
+
+  /**
+   * A correctly-hashed package carrying BOTH errors at once — the reviewer's
+   * own construction, and the one a single-phase probe cannot produce. The
+   * dangling edge is written as a FOREIGN producer's bytes because this
+   * emitter refuses to write one.
+   */
+  async function bothErrors(): Promise<Map<string, Uint8Array>> {
+    const tree = await emitKoineTree({
+      nodes: [
+        { id: 'n-rate', path: 'rate.md', format: 'markdown', bytes: '# Rate\n\n```shape\nkind: metric-definition\nunit: rate\n```\n' },
+        { id: 'n-b', path: 'b.md', format: 'markdown', bytes: 'b\n' },
+      ],
+      edges: [{ from: 'n-rate', to: 'n-b', type: 'supports' }],
+      types: { records: [RECORD] } as never,
+    })
+    const files = new Map<string, Uint8Array>([...tree].map(([k, v]) => [k, typeof v === 'string' ? enc.encode(v) : v]))
+    files.set('.koine/edges.jsonl', enc.encode(`${JSON.stringify({ from: 'n-rate', to: 'n-missing', type: 'supports' })}\n`))
+    files.set('koine.json', enc.encode(JSON.stringify({ koine: '0', name: 'both', version: '1.0.0', integrity: `sha256:${'0'.repeat(64)}` })))
+    const { manifest } = await sealPackage(files, { now: new Date('2026-09-17T00:00:00Z') })
+    files.set('koine.json', enc.encode(serializeManifest(manifest)))
+    return files
+  }
+
+  it('B15 — a computed verdict is NEVER reported as notRun', async () => {
+    const verdict = await admitPackage(await bothErrors(), { implements: [] })
+    expect(verdict.admitted).toBe(false)
+    expect(verdict.refusedAt).toBe('schema')
+
+    // Both verdicts were computed by one call, so both are answered…
+    expect(verdict.tree?.schema.status).toBe('fail')
+    expect(verdict.tree?.references.status).toBe('fail')
+    expect(verdict.tree?.references.problems.some(p => p.includes('n-missing'))).toBe(true)
+
+    // …and neither may appear in notRun, which says the result has no answer.
+    // Only identity and origin are genuinely unanswered: their work never ran.
+    expect(verdict.notRun).toEqual(['identity', 'origin'])
+  })
+
+  it('B15 — the honesty holds at the other end too: a refusal before the tree leaves both unanswered', async () => {
+    const verdict = await admitPackage(await packageNamed('alpha', { requires: ['locator'] }), { implements: [] })
+    expect(verdict.refusedAt).toBe('capabilities')
+    expect(verdict.tree).toBeUndefined()
+    expect(verdict.notRun).toEqual(['schema', 'references', 'identity', 'origin'])
+  })
+
+  /**
+   * B16 and the two halves the report could not see.
+   *
+   * The population is the FIELDS §3.3 governs, enumerated from the type
+   * definitions — not the call sites anybody remembered. That is the whole
+   * lesson: the Q3 repair reached three fields and two of six entry points, and
+   * a review found one of the four remaining. Enumerating found the rest.
+   */
+  it('one grammar, every field, BOTH halves', async () => {
+    const { parseEdgesJsonl, parseCommitsJsonl, emitEdgesJsonl, emitCommitsJsonl } = await import('../src/sidecars.js')
+    const { validateProposalEnvelope } = await import('../src/proposal.js')
+    const commit = (actor: string) => ({ seq: 1, actor, what: 'w', why: 'y', when: '2026-01-01T00:00:00Z' })
+    const edge = (actor: string) => ({ from: 'a', to: 'b', type: 'supports', actor })
+
+    for (const bad of ['bob', 'actor:user:', 'actor:robot:x', '']) {
+      // readers
+      expect(() => parseEdgesJsonl(`${JSON.stringify(edge(bad))}\n`)).toThrow()
+      expect(() => parseCommitsJsonl(`${JSON.stringify(commit(bad))}\n`)).toThrow()
+      expect(validateProposalEnvelope({ proposer: bad }).some(p => p.includes('proposer'))).toBe(true)
+      // writers — the half that decides what OTHER implementations receive
+      expect(() => emitEdgesJsonl([edge(bad)])).toThrow()
+      expect(() => emitCommitsJsonl([commit(bad)])).toThrow()
+      // and through the tree emitter, which is how anyone actually writes one
+      await expect(emitKoineTree({
+        nodes: [{ id: 'a', path: 'a.md', format: 'markdown', bytes: 'a\n' }],
+        commits: [commit(bad)],
+      })).rejects.toThrow()
+    }
+
+    // The valid value still passes every one of them.
+    expect(() => parseEdgesJsonl(`${JSON.stringify(edge('actor:user:test'))}\n`)).not.toThrow()
+    expect(() => emitEdgesJsonl([edge('actor:user:test')])).not.toThrow()
+    expect(() => emitCommitsJsonl([commit('actor:agent:noe')])).not.toThrow()
+    // An edge with NO actor is legal — absence is not malformation (§3.2).
+    expect(() => emitEdgesJsonl([{ from: 'a', to: 'b', type: 'supports' }])).not.toThrow()
+  })
+
+  it('a tree that does not parse fails INTEGRITY and says which half', async () => {
+    const { verifyKoineTree } = await import('../src/tree.js')
+    const files = await emitKoineTree({
+      nodes: [
+        { id: 'a', path: 'a.md', format: 'markdown', bytes: 'a\n' },
+        { id: 'b', path: 'b.md', format: 'markdown', bytes: 'b\n' },
+      ],
+      edges: [{ from: 'a', to: 'b', type: 'supports', actor: 'actor:user:ada' }],
+    })
+    const foreign = new Map(files)
+    foreign.set('.koine/edges.jsonl', (files.get('.koine/edges.jsonl') as string).replace('actor:user:ada', 'bob'))
+
+    const verdict = await verifyKoineTree(foreign)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.integrity.status).toBe('fail')
+    // The bucket is integrity (§3.5: the record parses, hashes recompute, the
+    // chain holds) and the TEXT says which half, so a syntax error is never
+    // read as byte tampering — two failures, two remedies.
+    expect(verdict.integrity.problems[0]).toContain('does not parse')
+    expect(verdict.schema.status).toBe('not-established')
+    expect(verdict.references.status).toBe('not-established')
+    expect(verdict.origin.status).toBe('not-established')
   })
 })

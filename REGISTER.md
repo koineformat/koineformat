@@ -25,7 +25,7 @@ keep resolving — and points here.
 | **blocked-on** | entry ids, or `trigger:"<falsifiable event>"` |
 | **verified** | the last date the claim was checked **against the code**, not against this file |
 
-**Five rules, all learned the hard way.**
+**Seven rules, all learned the hard way.**
 
 1. **A gap whose closing condition is an extraction names the artifact it will extract FROM,
    and checks that it exists.** Declared gap 2 waited a year to be *"extracted from the
@@ -65,6 +65,23 @@ keep resolving — and points here.
    owes a test of the whole path it governs, not only of its own function**, and that is what
    [`test/composition.test.ts`](test/composition.test.ts) is for.
 
+6. **A rule's population is the set of places the rule NAMES — never the sites you remember.**
+   The actor grammar is one rule over four fields and six entry points. The query that found it
+   enumerated the three sites it could recall, repaired those, and wrote a test titled *at all
+   three grains*. The fifth review round found the fourth field open (`edge.actor`); enumerating
+   the fields from the type definitions — `grep` for every declaration the grammar's own docblock
+   names — found both EMITTERS open too, which no reader-side probe could have reached. A finder
+   without a declared population is an opinion (rule 2), and that applies to a finder you are
+   running on your own repair.
+7. **A refusal's account is part of the refusal, and the account is what gets read.** Three
+   consecutive rounds found defects in what the codec SAID it had done rather than in what it
+   decided: the order documented and not implemented (B12), the stop rule at one step (B15), and
+   `notRun` naming a check whose result sat in the same object (B15, fifth round). Every one of
+   them refused the right artifact. **A report a consumer must cross-check against the result it
+   came with is a report that consumer will stop reading** — and then they read the source, which
+   is the outcome a specification exists to prevent. Deriving a fact by subtraction is only as
+   true as the universe you subtract from: the fourth round's repair derived `notRun` correctly
+   from a wrong set.
 ---
 
 ## Open
@@ -238,7 +255,10 @@ question. The form owes a declaration; whether it owes the verb is what this ent
 | **KF-20260917-B7-schema-id-substituted** | 2026-09-17 — the emitter accepted a foreign `$id` and the parser stripped it, so a re-emit substituted koine's. §2.1 now says the FILENAME binds and the author's `$id` travels |
 | **KF-20260917-Q1-locator-trusts-its-caller** | 2026-09-17 — **found here, reported by nobody.** `resolveLocator(locator, body, actualHash)` took the version it resolved against from its caller; handed `locator.contentHash` it answered `resolved` for every pointer forever, and `stale` — the whole yield of the required hash — became unreachable. §3.4 requires derivation; the reusing variant is `resolveLocatorAgainst`, named so the reuse is visible. An API break against 0.8.0, taken deliberately |
 | **KF-20260917-Q2-state-law-has-two-enforcers** | 2026-09-17 — **found here.** Closing B1 (*the seal drops the state*) taught `sealPackage` to read the shape block, which `emitKoineTree` already did: the repair for a law with one hole produced a law with two enforcers, and they had already drifted on a body whose declaration contradicts the asserted value. §4 states the resolution once; `travellingState` is the one function both boundaries call |
-| **KF-20260917-Q3-actor-grammar-three-times** | 2026-09-17 — **found here.** §3.3's grammar was implemented at three strictnesses: non-empty id in the seal, prefix-only in the proposal receiver, unchecked in `commits.jsonl`. Measured — `actor:user:` was a valid proposer and an invalid seal author, `bob` was a valid commit actor and invalid everywhere else. One `isKoineActor`, used at all three grains |
+| **KF-20260917-B15r-notrun-named-a-computed-check** | 2026-09-17 — the fifth round. A package carrying BOTH a schema-invalid body and a dangling edge reported `notRun: ["references", …]` in the same object that carried `references: fail` with the missing target named. `ran` was appended where each BRANCH was reached, while two computations produce five of the answers — so the fourth round's subtraction was correct over a wrong set. `ran` records where the ANSWER was computed; §7.15 states that schema and references are two verdicts of ONE computation and that `notRun` means *no answer in this result*, never *the flow did not reach this branch* |
+| **KF-20260917-B16-the-edge-actor-escaped-the-grammar** | 2026-09-17 — the fifth round found `edge.actor: "bob"` and `"actor:user:"` crossing parser, tree verify and admission untouched: the Q3 repair reached three of four fields because its population was the sites its author remembered. Enumerating the fields from the type definitions found **both emitters open as well** — `emitCommitsJsonl` would write an actor `parseCommitsJsonl` refuses, so the codec could emit a tree it could not read. One predicate, four fields, six entry points, reader AND writer. §3.3 now carries the emitter half; rule 6 above is this finding |
+| **KF-20260917-Q4-a-parse-failure-wore-integritys-name** | 2026-09-17 — **found here**, by running B15's shape (*does the account match what was done?*) against `verifyKoineTree` instead of `admitPackage`. Its docblock said no question could be asked of an unparseable tree and the code answered `integrity: fail` anyway. The verdict is right and §3.5's wording was narrower than the design: integrity asks whether the record is intact AND readable. §3.5 says so now, and the problem text names which half failed — a syntax error and a byte mismatch have two remedies and one bucket |
+| **KF-20260917-Q3-actor-grammar-three-times** | 2026-09-17 — **found here.** §3.3's grammar was implemented at three strictnesses: non-empty id in the seal, prefix-only in the proposal receiver, unchecked in `commits.jsonl`. Measured — `actor:user:` was a valid proposer and an invalid seal author, `bob` was a valid commit actor and invalid everywhere else. One `isKoineActor`, used at all three grains. **Corrected by B16:** the form has FOUR actor fields and this repair reached three, at the reader only — see the two rows above |
 
 ---
 
@@ -274,10 +294,20 @@ question. The form owes a declaration; whether it owes the verb is what this ent
 reviewing project took one synthetic knowledge slice through JSON and through koine into two
 isolated PostgreSQL/pgvector databases and ran its **unchanged** chunker, search service and
 retrieval node: *both paths return the same hits, the same sources and the same statement
-revisions.* A revision replaces the old chunks; a withdrawal leaves zero hits and zero chunks; an
-internal statement never reaches the released index; a corrupted package leaves the prior state
-intact and a mid-import SQL failure rolls back whole. Forty-four conditions, plus fourteen
-counter-probes of their package guard.
+revisions.* A revision replaces the old chunks; a withdrawal leaves **zero hits in the direct
+module search and zero chunks for that source** — their pipeline's own fallback, which searches
+without the module filter, still reaches an unrelated sentinel source, and zero hits across the
+whole pipeline is NOT what was shown; an internal statement never reaches the released index; a
+corrupted package leaves the prior state intact and a mid-import SQL failure rolls back whole.
+Forty-four conditions, plus fourteen counter-probes of their package guard. Their own follow-up
+work — a version filter carried through the retrieval node, structured metadata in the hit
+object, and hard rights limits that a fallback must not bypass — stays theirs and is open.
+
+**That paragraph is corrected 2026-09-17 at the consumer's request, and it is the third time
+this register has overstated their evidence in their direction.** The first two were a claimed
+acceptance and a claimed second implementation. Each time the overstatement was small, flattering
+to us, and about work we did not do. §5.6's claim ratchet is a rule about outward claims; a
+register that summarises somebody else's measurement is making one.
 
 That is the strongest external evidence this form has, and it is **theirs to characterize, not
 this register's**: it is a limited integration test on synthetic data with fixed test vectors, not

@@ -289,7 +289,7 @@ and only the edge *type* (§2.1) is vocabulary.
   | facet | what it carries |
   |---|---|
   | `fromLocator` · `toLocator` | where that end LANDS inside its body, and against which version — §3.4 |
-  | `actor` | who asserted it, as `actor:(user\|agent):<id>` — the spelling §3.3 uses |
+  | `actor` | who asserted it, as `actor:(user\|agent):<id>` — §3.3's grammar, VALIDATED here, not merely spelled the same way |
   | `when` | when it was asserted; ISO-8601 **UTC (`Z`)** |
   | `validFrom` · `validTo` | the interval the assertion is held to be true; `validTo` absent means still held |
   | `weight` | a number — the **instance carrier** for the `weight` *semantics* its edge type declares (§2.1) |
@@ -332,17 +332,27 @@ read (§7.11).
   gate.
 
   **`actor:(user|agent):<id>` is ONE grammar, and every field naming an actor is validated
-  against it.** This document has three such fields — `actor` here, a proposal's `proposer`
-  (chapter 5) and a seal's `author` together with its certificate's `delegatedTo` (chapter 6)
-  — and they are the same grammar, not three similar ones. `<id>` is non-empty, the role is
-  exactly `user` or `agent`, and nothing else parses. A reader MUST refuse a malformed actor
-  wherever it appears, and the refusal names the field it refused.
+  against it.** This document has four such fields — `actor` here, an EDGE's `actor` (§3.2), a
+  proposal's `proposer` (chapter 5) and a seal's `author` together with its certificate's
+  `delegatedTo` (chapter 6) — and they are the same grammar, not four similar ones. `<id>` is
+  non-empty, the role is exactly `user` or `agent`, and nothing else parses.
 
-  Stated normatively because it was implemented three times at three strictnesses, and a
-  grammar with three readers is not a grammar. Measured against the reference codec on
-  2026-09-17: `actor:user:` — a role with no identity behind it — was a valid proposer and an
-  invalid seal author, and `bob` was a valid commit actor and invalid everywhere else. Neither
-  split was a decision anybody made; both were the gap between one rule and its copies.
+  **Both halves, and the writer's is the one that matters to everyone else.** A reader MUST
+  refuse a malformed actor wherever it appears, naming the field it refused; an **emitter MUST
+  refuse to write one**. Refusing at read protects an implementation from other people's
+  artifacts; refusing at write protects other people from its own — and an emitter that writes
+  what its own parser rejects has produced a tree no conformant reader will accept, discoverable
+  only by a roundtrip nobody runs. §3.4 already states this for the Locator's `contentHash`; it
+  is the same law and it holds for every field this document constrains.
+
+  Stated normatively because it was implemented three times at three strictnesses, and a grammar
+  with three readers is not a grammar. Measured against the reference codec on 2026-09-17:
+  `actor:user:` — a role with no identity behind it — was a valid proposer and an invalid seal
+  author, and `bob` was a valid commit actor and invalid everywhere else. The repair for THAT
+  reached three fields and two of six entry points, because its population was the sites its
+  author remembered rather than the fields this section governs; an outside review found the
+  edge's `actor` still open, and enumerating the fields from the type definitions found both
+  emitters open as well. A rule's population is the set of places the rule NAMES.
 - **`chain.jsonl`** — the Merkle chain. Line 1 is a header declaring `format` and `algo`.
   Then one link per commit: `{"seq", "commit", "prev", "hash"}`.
 
@@ -440,7 +450,7 @@ spelling of either other one.
 
 | verdict | the question |
 |---|---|
-| **integrity** | every `contentHash` recomputes, and the chain (§3.3) holds |
+| **integrity** | the tree's own record parses, every `contentHash` recomputes, and the chain (§3.3) holds |
 | **schema** | every body that declares a shape block names a record type this tree carries, validates against it (§2.2), and its declared `state` agrees with the identity map's |
 | **references** | every edge, every commit `node` and every Locator names something that exists — and every Locator's `contentHash` matches the body it addresses |
 | **origin** | who vouches for this (chapter 6). `not-established` until a seal travels |
@@ -451,6 +461,12 @@ chain is broken, and a reader handed `false` for both has to re-derive which it 
 same applies in the other direction and is why `not-established` exists — **an unasked
 question that reports `true` is indistinguishable, at every call site, from one that was
 asked and passed.**
+
+**The parse half is integrity's, and it is stated because the code always enforced it and this
+table did not say so.** A sidecar that does not parse leaves the other three questions unasked —
+they report `not-established` — while integrity FAILS: an unreadable record is not an intact one.
+The verdict's problem text says which half failed, because a syntax error and a byte mismatch
+have two different remedies (tell the producer · fetch the bytes again) and one bucket.
 
 A `not-established` **origin does not make a tree invalid**: the seal is additive, never a
 gate (§6.2). A verifier's overall pass is *no verdict failed*.
@@ -1412,8 +1428,12 @@ single call**, and this one does (`admitPackage`):
    implement a required capability must not form an opinion about the content at all, because
    its opinion would be the guess §8.1 exists to forbid;
 3. **schema and references** — every body against the record type it declares, every edge,
-   commit and Locator against what the tree holds (§3.5);
-4. **completeness** — no body the package declares `required` is absent (§3.2);
+   commit and Locator against what the tree holds (§3.5). These are **two verdicts of one
+   computation**, never two sequential gates: §3.5's questions are independent and are answered
+   together, so a reader receives both answers whenever the tree was verified at all. The step
+   names say which verdict REFUSED;
+4. **completeness** — no body the package declares `required` is absent (§3.2). Answered by
+   step 1's read, reported here;
 5. **identity** — the package is the one the caller pinned, when one was pinned;
 6. **origin** — any seal that travelled verifies (chapter 6). An absent seal does not refuse; a
    seal that was OFFERED and does not verify does. The gate is on offering one at all, never on
@@ -1439,6 +1459,21 @@ forbids — so the later steps do not run, and the verdict says which. Omitting 
 read, at every call site, exactly like a verdict where they passed. **A step that did not run and
 a step that passed must never be spelled the same way**, which is §3.5's rule for verdicts applied
 to a sequence of them.
+
+**`notRun` means the result carries NO ANSWER for that step — never merely that the flow did not
+reach its branch.** Two causes put a step there: an earlier refusal stopped the flow before the
+answer could be computed, or the package gave the question no subject (an archive with no koine
+tree cannot be asked whether its bodies satisfy their record types). What `notRun` does NOT mean
+is *you may not act on this*; that is what the refusal says, and they are two facts with two
+fields.
+
+The distinction is normative because deriving the set by subtraction is only as true as the set
+it subtracts from. A reference implementation that appended each step to *ran* where its BRANCH
+was reached — while two computations produced five of the answers — reported
+`notRun: ["references", …]` in the same object that carried `references: fail` with the missing
+edge target named. Nothing was admitted that should not have been, and the account of the refusal
+was false, which is its own defect: **a report a consumer must cross-check against the result it
+came with is a report that consumer will stop reading.**
 
 **A malformed artifact is a verdict, not an exception.** A sidecar that does not parse yields a
 refusal with a step and reasons; a thrown error has neither, and every catch site invents its own
@@ -1687,6 +1722,52 @@ and for a year it did not.
 ---
 
 ## Changelog
+
+### 2026-09-17 (fifth round) — the account of a refusal, and what a query's population is
+
+Two P2s. Both are the same defect one level up from the code: **the codec decided correctly and
+described what it had done untruthfully.** Neither was an admission or signature bypass, and the
+reviewer said so first.
+
+- **`notRun` named a check whose result sat in the same object.** A correctly-hashed package
+  carrying BOTH a schema-invalid body and an edge to a missing node reported `refusedAt: "schema"`
+  with `notRun: ["references", …]` — while the same verdict carried `references: fail` and named
+  the missing target. The cause is the fourth round's own repair: `notRun` was derived by
+  subtraction, correctly, from a set of steps appended where each BRANCH was reached — and two
+  computations produce five of the answers. **A derivation is only as true as the universe it
+  subtracts from.** §7.15 now states that schema and references are two verdicts of one
+  computation, that completeness is answered by the read at step 1, and that `notRun` means *this
+  result carries no answer* rather than *the flow did not reach this branch*.
+- **`edge.actor` never got the grammar.** The previous round unified the actor grammar and wrote a
+  test titled *at all three grains*. The form has **four** actor fields. The repair's population
+  was the sites its author remembered, which is the definition of an opinion — and an outside
+  reader found the one it missed.
+
+**Enumerating that population properly found two more, and they are the worse half.** The four
+fields have six entry points, and the query had only ever considered readers: `emitCommitsJsonl`
+and `emitEdgesJsonl` would write an actor the matching parser refuses. **The codec could emit a
+tree it could not read**, discoverable only by a roundtrip nobody runs. §3.3 now states both
+halves and says which one matters to other people:
+
+> Refusing at read protects an implementation from other people's artifacts; refusing at write
+> protects other people from its own.
+
+§3.4 had carried that law for the Locator since it was written. It simply was never generalized.
+
+**One more, from running the round's own shape as a query.** Asking *does the account match what
+was done?* of `verifyKoineTree` rather than of `admitPackage`: its docblock said no question could
+be asked of an unparseable tree, and the code answered `integrity: fail` anyway. The verdict turned
+out to be right and **this document's wording was narrower than its design** — §3.5 defined
+integrity as hashes and the chain, while every implementation also required the record to be
+readable. §3.5 says so now, and the problem text names which half failed, because a syntax error
+and a byte mismatch have one bucket and two different remedies.
+
+**The register's summary of the reviewer's consumer run is corrected too**, at their request: a
+withdrawal leaves zero hits *in the direct module search* and zero chunks for that source; their
+pipeline's own unfiltered fallback still reaches an unrelated sentinel, and zero hits across the
+whole pipeline was never shown. That is the **third** time this register has overstated their
+evidence in our favour. §5.6's ratchet is a rule about outward claims, and a register that
+summarises somebody else's measurement is making one.
 
 ### 2026-09-17 (the query pass) — three defects nobody reported
 

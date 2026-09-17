@@ -364,7 +364,12 @@ describe('B4 — one call composes the five checks, and names the one that refus
     // passed.
     const verdict = await admitPackage(await pkg({ requires: ['locator'] }), { implements: [] })
     expect(verdict.refusedAt).toBe('capabilities')
-    expect(verdict.notRun).toEqual(['schema', 'references', 'completeness', 'identity', 'origin'])
+    // **Corrected in the fifth round (B15).** This listed `completeness` too —
+    // and the read at step 1 had already answered it: `inspection.absent` is
+    // computed independently of `status` and rides in `package`. `notRun` says
+    // the result carries NO ANSWER; whether an answer may be ACTED ON is what
+    // `refusedAt` and the stop rule say. Two facts, two fields.
+    expect(verdict.notRun).toEqual(['schema', 'references', 'identity', 'origin'])
     expect(verdict.tree).toBeUndefined()
     // What WAS established before the refusal is still carried through.
     expect(verdict.package.status).toBe('ok')
