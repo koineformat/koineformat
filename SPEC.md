@@ -206,8 +206,10 @@ a validator MUST honour both wherever a subschema may appear — inside `not`, `
 `items`, `anyOf` and the rest. Treating a non-object schema as *nothing to check* inverts three
 keywords at once and fails OPEN in two of them.
 
-**Value equality ignores object key order.** `const` and `enum` compare shapes, and a shape's key
-order is not a fact about it: a record written by one producer and re-serialized by a reader is
+**Value equality ignores object key order, and ABSENCE is not `null`.** A missing member and a
+member whose value is `null` are different facts — chapter 5's diff turns on exactly that
+distinction — so equality answers presence before it compares values. `const` and `enum` compare
+shapes, and a shape's key order is not a fact about it: a record written by one producer and re-serialized by a reader is
 the same record. An equality that depended on serialization made `const` reject the very object it
 names.
 
@@ -1367,19 +1369,32 @@ one order, with one verdict. **A reference implementation SHOULD offer that comp
 single call**, and this one does (`admitPackage`):
 
 1. **the envelope and the bytes** — readable manifest, root hash, the identity map's listing, and
-   the lockfile pin when the consumer holds one (§7.3 · §7.4 · §7.7);
+   the lockfile pin when the consumer holds one (§7.3 · §7.4 · §7.7). A sidecar that does not
+   parse refuses here rather than throwing;
 2. **required capabilities** (§8.1), *before* any semantic check — a reader that does not
    implement a required capability must not form an opinion about the content at all, because
    its opinion would be the guess §8.1 exists to forbid;
 3. **schema and references** — every body against the record type it declares, every edge,
    commit and Locator against what the tree holds (§3.5);
 4. **completeness** — no body the package declares `required` is absent (§3.2);
-5. **origin** — any seal that travelled verifies (chapter 6). An absent seal does not refuse; a
+5. **identity** — the package is the one the caller pinned, when one was pinned;
+6. **origin** — any seal that travelled verifies (chapter 6). An absent seal does not refuse; a
    seal that was OFFERED and does not verify does. The gate is on offering one at all, never on
    it being honest once offered.
 
 The verdict names the FIRST step that refused and carries every sub-verdict unmodified, so
 nothing hides behind the first answer.
+
+**The steps are declared ONCE, in order, and `notRun` is derived from them by
+subtraction.** Two lists — a sequence and a set of skippable steps — are two truths that drift:
+this one was written as a hand-kept list and reported the wrong set the day a step was added.
+A step that is added and forgotten must show up as permanently not-run, never as silently
+absent.
+
+**Identity is its own step, and it needs nobody to have vouched.** *Is this the package the
+caller expected* is answerable from the manifest alone, so a pinned expectation is compared
+whether or not a seal was offered — and compared CANONICALLY, because a subject's key order is
+not a fact about which package it names.
 
 **A refusal STOPS the flow, and the steps that did not run are named.** A reader that lacks a
 required capability must not go on to judge the content — its judgement would be the guess §8.1
@@ -1635,6 +1650,38 @@ and for a year it did not.
 ---
 
 ## Changelog
+
+### 2026-09-17 (fourth round) — the shape of a repair, and the query it should have triggered
+
+All five findings of the third round verified fixed by the reviewer. Three more, all P2, and
+their common property is the one worth recording: **two of the three were introduced by the
+previous round's repairs, and the third was a rule written into this document and implemented at
+one of its five steps.**
+
+- **An expected package identity was compared only in company.** `expectedSubject` was checked
+  inside the seal branch, so a caller who pinned an expectation and offered no seal had it
+  silently ignored — an option contract promising a comparison and delivering one conditionally.
+  Identity is now its own step in §7.15: *is this the package the caller expected* is answerable
+  from the manifest alone.
+- **That comparison was order-dependent** — raw serialized equality, written the same day the
+  canonical one was introduced three files away. §2.2's rule now reads at the subject too.
+- **A missing field and a `null` one became equal.** The third round's canonicalization repair
+  made `undefined` render as `"null"` — correct inside an array, wrong as an equality — so a
+  proposal ADDING a field as `null` was read as changing nothing. §2.2 states it: absence is
+  answered before values are compared.
+- **The stop-on-refusal rule was applied at one step of five**, and the single early return
+  overwrote the earlier refusal it was meant to preserve. §7.15 now declares the steps ONCE and
+  derives `notRun` by subtraction, so a step that is added and forgotten shows up as permanently
+  not-run rather than as silently absent.
+
+**What the round taught beyond its own findings, recorded because it is now the fourth
+occurrence.** A reported defect is a SHAPE, not a site. Running the third round's two shapes as
+queries over the whole source — *where else is equality serialized?* and *where else is a rule
+applied at one site?* — found the reported instance **and one the review could not have seen**: a
+seal's own subject comparison, reachable only by a foreign producer, which would have refused a
+valid seal from a second implementation that serialized the subject's keys in another order. That
+is an interoperability defect in precisely the path a second implementation proves itself
+through, and it was found by asking a question rather than by reading a report.
 
 ### 2026-09-17 (third round) — the defect in the repair of the repair
 

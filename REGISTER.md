@@ -25,7 +25,7 @@ keep resolving — and points here.
 | **blocked-on** | entry ids, or `trigger:"<falsifiable event>"` |
 | **verified** | the last date the claim was checked **against the code**, not against this file |
 
-**Four rules, all learned the hard way.**
+**Five rules, all learned the hard way.**
 
 1. **A gap whose closing condition is an extraction names the artifact it will extract FROM,
    and checks that it exists.** Declared gap 2 waited a year to be *"extracted from the
@@ -42,7 +42,14 @@ keep resolving — and points here.
    without being validated (B10), the id matched without its version (B11). The fix is a TYPE,
    not a docblock — `admitPackage` no longer accepts a subject at all, and an API that cannot
    express the mistake needs no rule against it.
-4. **A law with two enforcers is a law with a hole in it.** Seven of the nine defects found by
+4. **A reported defect is a SHAPE, not a site — run it as a query before closing it.** Two of
+   round 4's three findings were introduced BY round 3's repairs, and the third was a rule
+   written into the specification and implemented at one step of five. Running round 3's shapes
+   as queries (*where else is equality serialized? where else is a rule applied at one site?*)
+   found the reported instances **and one the reviewer could not have seen** — a seal's own
+   subject comparison, reachable only from a foreign producer, which would have refused a valid
+   seal from a second implementation. The query costs minutes; the alternative is another round.
+5. **A law with two enforcers is a law with a hole in it.** Seven of the nine defects found by
    outside review lived BETWEEN the pieces, not inside them — the travel law held in
    `emitKoineTree` and not in `sealPackage`, a capability could be named and never refused, a
    verifier checked a mandate only where one already was. Every piece was green. **A new law
@@ -216,6 +223,9 @@ question. The form owes a declaration; whether it owes the verb is what this ent
 | **KF-20260917-B10-actor-grammar-unchecked** | 2026-09-17 — a mandate signed by another AGENT was accepted (a chain with no person at the end), an author that was not an actor at all passed every prefix test, and a missing author threw a `TypeError`. Structure is validated before semantics, and each case has a named refusal |
 | **KF-20260917-B11-version-suffix-ignored** | 2026-09-17 — `metric@v999` resolved to `metric@v0` because the id was matched on its name and the version discarded. The whole id is compared, and a record type carrying its own `$id` is addressed by it |
 | **KF-20260917-B12-order-documented-not-implemented** | 2026-09-17 — `admitPackage`'s docblock said capabilities refuse *before* any semantic check and the code ran them anyway; a malformed sidecar escaped as an uncaught `KoineParseError`. The order is the code's now, skipped steps are NAMED in `notRun`, and a parse failure is a verdict |
+| **KF-20260917-B13-expected-identity-ignored** | 2026-09-17 — `expectedSubject` was compared only inside the seal branch, and compared by serialized order. Identity is its own step now, checked without a seal and canonically; the same query found the unreported sibling in `verifySeal`'s own subject comparison |
+| **KF-20260917-B14-absence-equalled-null** | 2026-09-17 — the round-3 canonicalization repair made `undefined` render as `"null"`, so a proposal adding a field as `null` read as changing nothing. Equality answers presence before it compares values |
+| **KF-20260917-B15-stop-rule-at-one-step** | 2026-09-17 — §7.15's stop-on-refusal was implemented at one step of five, and the single early return overwrote the first refusal. The steps are declared once and `notRun` is derived by subtraction |
 | **KF-20260917-B7-schema-id-substituted** | 2026-09-17 — the emitter accepted a foreign `$id` and the parser stripped it, so a re-emit substituted koine's. §2.1 now says the FILENAME binds and the author's `$id` travels |
 
 ---
@@ -247,6 +257,20 @@ question. The form owes a declaration; whether it owes the verb is what this ent
   [`test/composition.test.ts`](test/composition.test.ts)) — the 2026-09-17 review's own
   reproductions, kept in the reporter's framing and named by their finding ids, so a test that
   closes a finding can still be read against the report that opened it.
+
+**A real consumer has now read koine end to end, and it is not ours.** On 2026-09-17 the
+reviewing project took one synthetic knowledge slice through JSON and through koine into two
+isolated PostgreSQL/pgvector databases and ran its **unchanged** chunker, search service and
+retrieval node: *both paths return the same hits, the same sources and the same statement
+revisions.* A revision replaces the old chunks; a withdrawal leaves zero hits and zero chunks; an
+internal statement never reaches the released index; a corrupted package leaves the prior state
+intact and a mid-import SQL failure rolls back whole. Forty-four conditions, plus fourteen
+counter-probes of their package guard.
+
+That is the strongest external evidence this form has, and it is **theirs to characterize, not
+this register's**: it is a limited integration test on synthetic data with fixed test vectors, not
+a production acceptance, and they say so. What it settles is narrower and real — the form carries
+enough for a working consumer to behave identically to the one it already had.
 
 **The nearest thing to a second implementation is not ours.** The same review reports an
 independent Python reader over a subset of the form, built for its own adapter pilot, resolving

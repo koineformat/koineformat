@@ -41,7 +41,7 @@
 import { sha256Bytes, sha256Hex } from './sha256.js'
 // ONE canonicalization for the whole package — a manifest digest and a `const`
 // comparison that disagree about what a JSON value IS are two bugs waiting.
-import { canonicalJson } from './schema.js'
+import { canonicalJson, deepEqual } from './schema.js'
 import type { KoineContentHash } from './types.js'
 
 /** The DSSE `payloadType` of a koine seal. */
@@ -276,8 +276,21 @@ function isActor(value: unknown, role?: 'user' | 'agent'): boolean {
   return match !== null && match[2] !== '' && (role === undefined || match[1] === role)
 }
 
-const sameSubject = (a: KoineSealSubject, b: KoineSealSubject): boolean =>
-  JSON.stringify(a) === JSON.stringify(b)
+/**
+ * Subject equality — CANONICAL, never serialized-order.
+ *
+ * **Found by running B13's shape as a query rather than as a fix.** The reviewer
+ * reported the order-dependent comparison in `admitPackage`; this is its
+ * sibling, one layer down, and nobody reported it because it is only reachable
+ * from a foreign producer. A seal built by a second implementation that
+ * serializes the subject's keys in another order would have failed to verify
+ * against a subject this one derived — an interoperability defect in exactly the
+ * path a second implementation is supposed to prove itself through.
+ *
+ * The payload's authenticated BYTES are untouched: what is canonicalized here is
+ * only the comparison of two already-parsed subjects.
+ */
+const sameSubject = (a: KoineSealSubject, b: KoineSealSubject): boolean => deepEqual(a, b)
 
 /**
  * Verify a seal, offline, consulting nothing but the shipped bytes and public

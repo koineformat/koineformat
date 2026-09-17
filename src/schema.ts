@@ -95,8 +95,22 @@ export function canonicalJson(value: unknown): string {
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`
 }
 
-/** Value equality that ignores object key order — see {@link canonicalJson}. */
-export const deepEqual = (a: unknown, b: unknown): boolean => canonicalJson(a) === canonicalJson(b)
+/**
+ * Value equality that ignores object key ORDER and distinguishes ABSENCE from
+ * `null` — see {@link canonicalJson}.
+ *
+ * **The presence test comes first, and B14 is why.** `canonicalJson(undefined)`
+ * is `"null"` — it must be, because that is what `JSON.stringify` does inside an
+ * array — so an equality built on the string alone made a missing field equal to
+ * a `null` one. The proposal contract distinguishes them explicitly (an omitted
+ * `from` means the field was absent; `null` is the JSON value null), so a
+ * proposal ADDING a field as `null` was read as changing nothing and refused as
+ * internally inconsistent.
+ *
+ * Absence is not a value. It is answered before values are compared at all.
+ */
+export const deepEqual = (a: unknown, b: unknown): boolean =>
+  (a === undefined) === (b === undefined) && canonicalJson(a) === canonicalJson(b)
 
 /**
  * Validate a value against a record type's schema. Returns every problem found,

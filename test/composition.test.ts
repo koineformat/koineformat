@@ -364,7 +364,7 @@ describe('B4 — one call composes the five checks, and names the one that refus
     // passed.
     const verdict = await admitPackage(await pkg({ requires: ['locator'] }), { implements: [] })
     expect(verdict.refusedAt).toBe('capabilities')
-    expect(verdict.notRun).toEqual(['schema', 'references', 'completeness', 'origin'])
+    expect(verdict.notRun).toEqual(['schema', 'references', 'completeness', 'identity', 'origin'])
     expect(verdict.tree).toBeUndefined()
     // What WAS established before the refusal is still carried through.
     expect(verdict.package.status).toBe('ok')

@@ -32,21 +32,34 @@
  */
 
 import { checkCapabilities, type CapabilityCheck } from './capabilities.js'
+import { deepEqual } from './schema.js'
 import { inspectFiles, type PackageInspection } from './core/verify.js'
 import { manifestPapers, packageSubject, verifySeal, type SchnorrVerify, type SealVerdict } from './seal.js'
 import { parseKoineTree, verifyKoineTree, KOINE_DIR } from './tree.js'
 import type { KoineDsseEnvelope, KoineSealSubject } from './seal.js'
 import type { KoineContentHash, KoineVerdict, KoineVerifyResult } from './types.js'
 
+/**
+ * The steps, IN ORDER — one declaration that the flow and `notRun` both read.
+ *
+ * Two lists would be two truths: the sequence would drift from the set a verdict
+ * reports as skipped, and nothing would notice. `notRun` is derived from this by
+ * subtraction, so a step that is added and forgotten shows up as permanently
+ * not-run rather than as silently absent.
+ */
+export const ADMISSION_STEPS = [
+  'envelope',
+  'integrity',
+  'capabilities',
+  'schema',
+  'references',
+  'completeness',
+  'identity',
+  'origin',
+] as const
+
 /** Which step refused. `undefined` when nothing did. */
-export type AdmissionStep =
-  | 'envelope'
-  | 'integrity'
-  | 'capabilities'
-  | 'schema'
-  | 'references'
-  | 'completeness'
-  | 'origin'
+export type AdmissionStep = (typeof ADMISSION_STEPS)[number]
 
 export interface AdmitOptions {
   /**
@@ -132,27 +145,72 @@ export async function admitPackage(
   options: AdmitOptions,
 ): Promise<AdmissionVerdict> {
   const reasons: string[] = []
+  const ran: AdmissionStep[] = []
   let refusedAt: AdmissionStep | undefined
+
+  let inspection: PackageInspection = { status: 'error' }
+  let capabilities: CapabilityCheck = { honoured: false, missing: [] }
+  let tree: KoineVerifyResult | undefined
+  let sealVerdict: SealVerdict | undefined
+  let origin: KoineVerdict = NOT_CHECKED('nothing was checked')
 
   const refuse = (step: AdmissionStep, why: readonly string[]): void => {
     refusedAt ??= step
     reasons.push(...why)
   }
 
-  // ── 1. the envelope and the bytes ──────────────────────────────────────────
-  const inspection = await inspectFiles(files, {
-    ...(options.expectedIntegrity === undefined ? {} : { expectedIntegrity: options.expectedIntegrity }),
-  })
-  if (inspection.status === 'error') {
+  /**
+   * One exit, and `notRun` derived from what actually ran rather than listed by
+   * hand.
+   *
+   * **B15.** The STOP rule was written into §7.15 and implemented at exactly one
+   * of the steps, so an integrity or schema refusal went on to check origin —
+   * and the one early return HARDCODED `refusedAt: 'capabilities'`, overwriting
+   * the earlier refusal it was supposed to preserve. A rule applied at the site
+   * that was reported is not a rule; this shape makes the omission unwritable,
+   * because a step that does not run cannot be added to `ran`.
+   */
+  const finish = (): AdmissionVerdict => {
+    const notRun = ADMISSION_STEPS.filter((step: AdmissionStep) => !ran.includes(step))
     return {
-      admitted: false,
-      refusedAt: 'envelope',
-      reasons: [inspection.message ?? 'the package could not be read'],
+      admitted: refusedAt === undefined,
+      ...(refusedAt === undefined ? {} : { refusedAt }),
+      reasons,
+      ...(notRun.length > 0 ? { notRun } : {}),
       package: inspection,
-      capabilities: { honoured: false, missing: [] },
-      origin: NOT_CHECKED('the package did not parse'),
+      ...(tree === undefined ? {} : { tree }),
+      capabilities,
+      origin,
+      ...(sealVerdict === undefined ? {} : { seal: sealVerdict }),
     }
   }
+
+  // ── 1. the envelope and the bytes ──────────────────────────────────────────
+  inspection = await inspectFiles(files, {
+    ...(options.expectedIntegrity === undefined ? {} : { expectedIntegrity: options.expectedIntegrity }),
+  })
+  ran.push('envelope')
+  if (inspection.status === 'error') {
+    refuse('envelope', [inspection.message ?? 'the package could not be read'])
+    origin = NOT_CHECKED('the package did not parse')
+    return finish()
+  }
+
+  // A malformed sidecar is a verdict, not an exception: a thrown parse error has
+  // no step and no reasons, and every catch site invents a meaning for it.
+  const hasTree = files.has(`${KOINE_DIR}/nodes.jsonl`)
+  let treeRequires: readonly string[] = []
+  if (hasTree) {
+    try {
+      treeRequires = parseKoineTree(files).requires
+    } catch (error) {
+      refuse('envelope', [`the koine tree does not parse — ${error instanceof Error ? error.message : String(error)}`])
+      origin = NOT_CHECKED('the tree did not parse')
+      return finish()
+    }
+  }
+
+  ran.push('integrity')
   if (inspection.status === 'modified') {
     refuse('integrity', [
       'the package does not match its own listing',
@@ -161,116 +219,93 @@ export async function admitPackage(
       ...(inspection.rootMatches === false ? ['the root hash does not match the tree'] : []),
       ...(inspection.lockMatches === false ? ['the manifest does not match the lockfile pin'] : []),
     ])
+    origin = NOT_CHECKED('the bytes are not what the package says they are, so nothing downstream was checked')
+    return finish()
   }
 
   // ── 2. what this reader must understand, before it understands anything ────
-  //
-  // **B12.** A malformed sidecar reached here as an uncaught `KoineParseError`,
-  // so a caller asking *may I admit this* got an exception instead of a refusal
-  // — and an exception is not a verdict: it has no step, no reasons, and every
-  // catch site invents its own meaning for it.
-  const hasTree = files.has(`${KOINE_DIR}/nodes.jsonl`)
-  let treeRequires: readonly string[] = []
-  if (hasTree) {
-    try {
-      treeRequires = parseKoineTree(files).requires
-    } catch (error) {
-      return {
-        admitted: false,
-        refusedAt: 'envelope',
-        reasons: [`the koine tree does not parse — ${error instanceof Error ? error.message : String(error)}`],
-        package: inspection,
-        capabilities: { honoured: false, missing: [] },
-        origin: NOT_CHECKED('the tree did not parse'),
-      }
-    }
-  }
   const declared = [
     ...((inspection.manifest as { requires?: string[] } | undefined)?.requires ?? []),
     ...treeRequires,
   ]
-  const capabilities = checkCapabilities([...new Set(declared)], options.implements)
+  capabilities = checkCapabilities([...new Set(declared)], options.implements)
+  ran.push('capabilities')
   if (!capabilities.honoured) {
     refuse('capabilities', capabilities.missing.map(
       token => `this reader does not implement "${token}", which the package requires (SPEC §8.1)`,
     ))
-    // **B12, and it is the sharper half.** This function's own docblock said
-    // capabilities refuse BEFORE any semantic check — and the code ran the
-    // semantic checks anyway. A reader that lacks a required capability must not
-    // form an opinion about the content at all, because its opinion is exactly
-    // the guess §8.1 forbids; continuing produced verdicts nobody was entitled
-    // to. The steps that did not run are NAMED, so a `pass` is never inferred
-    // from an absence.
-    return {
-      admitted: false,
-      refusedAt: 'capabilities',
-      reasons,
-      notRun: ['schema', 'references', 'completeness', 'origin'],
-      package: inspection,
-      capabilities,
-      origin: NOT_CHECKED('the reader lacks a required capability, so nothing downstream was checked'),
-    }
+    origin = NOT_CHECKED('the reader lacks a required capability, so nothing downstream was checked')
+    return finish()
   }
 
   // ── 3 & 4. the meaning layer, when the archive carried one ─────────────────
-  let tree: KoineVerifyResult | undefined
-  if (hasTree) {
-    tree = await verifyKoineTree(files)
-    if (tree.integrity.status === 'fail') refuse('integrity', tree.integrity.problems)
-    if (tree.schema.status === 'fail') refuse('schema', tree.schema.problems)
-    if (tree.references.status === 'fail') refuse('references', tree.references.problems)
+  if (hasTree) tree = await verifyKoineTree(files)
+  ran.push('schema')
+  if (tree?.schema.status === 'fail') {
+    refuse('schema', tree.schema.problems)
+    origin = NOT_CHECKED('the bodies do not satisfy their declared types, so nothing downstream was checked')
+    return finish()
+  }
+  ran.push('references')
+  if (tree?.integrity.status === 'fail' || tree?.references.status === 'fail') {
+    refuse('references', [...tree.integrity.problems, ...tree.references.problems])
+    origin = NOT_CHECKED('the tree names something it does not hold, so nothing downstream was checked')
+    return finish()
   }
 
   // ── 5. what the package says it does not carry ─────────────────────────────
+  ran.push('completeness')
   if (inspection.status === 'incomplete') {
     refuse('completeness', (inspection.absent ?? [])
       .filter(body => body.required)
       .map(body => `the package declares "${body.path}" as required and does not carry it`))
+    origin = NOT_CHECKED('a required body is missing, so origin was not checked')
+    return finish()
   }
 
-  // ── 6. who vouches — additive, never a gate, and never silently absent ─────
-  let sealVerdict: SealVerdict | undefined
-  let origin: KoineVerdict
+  // ── 6. is this the package the caller expected ─────────────────────────────
+  //
+  // **B13.** `expectedSubject` was only compared inside the seal branch, so a
+  // caller that pinned an expectation and offered no seal had it silently
+  // ignored — the option contract promised a comparison and the code delivered
+  // one only in company. It is its own step because it is its own question:
+  // identity is WHICH package this is, and needs nobody to have vouched for it.
+  const manifest = inspection.manifest as unknown as Record<string, unknown> | undefined
+  const derived = manifest === undefined
+    ? undefined
+    : packageSubject(
+        manifest['name'] as string,
+        manifest['version'] as string,
+        manifest['integrity'] as KoineContentHash,
+        await manifestPapers(manifest),
+      )
+  ran.push('identity')
+  if (options.expectedSubject !== undefined) {
+    if (derived === undefined || !deepEqual(options.expectedSubject, derived)) {
+      refuse('identity', ['the package is not the one the caller expected'])
+      origin = NOT_CHECKED('the package is not the expected one, so origin was not checked')
+      return finish()
+    }
+  }
+
+  // ── 7. who vouches — additive, never a gate, and never silently absent ─────
+  ran.push('origin')
   if (options.seal === undefined) {
     origin = NOT_CHECKED('no seal was offered with this package — origin is unproven, not unsound (SPEC §6.2)')
-  } else if (inspection.manifest === undefined) {
+  } else if (derived === undefined) {
     origin = NOT_CHECKED('the manifest did not read, so no subject could be derived to check the seal against')
   } else {
-    // DERIVED, never accepted. The subject is what THIS package is, computed
-    // from the manifest this function read — name, version, root hash, and a
-    // digest over the papers (§6.3). A seal made over any other package now
-    // fails as `subject-mismatch`, which is what B8 reported it did not.
-    const manifest = inspection.manifest as unknown as Record<string, unknown>
-    const derived = packageSubject(
-      manifest['name'] as string,
-      manifest['version'] as string,
-      manifest['integrity'] as KoineContentHash,
-      await manifestPapers(manifest),
-    )
-    if (options.expectedSubject !== undefined
-      && JSON.stringify(options.expectedSubject) !== JSON.stringify(derived)) {
-      refuse('origin', ['the package is not the one the caller expected to be sealed'])
-    }
+    // DERIVED, never accepted (§6.3): the subject is what THIS package is.
     sealVerdict = await verifySeal(options.seal.envelope, derived, options.seal.verify)
     if (sealVerdict.valid) {
       origin = { status: 'pass', problems: [] }
     } else {
-      // A seal that was OFFERED and does not verify is a refusal. That is not in
-      // tension with "additive, never a gate": the gate is on offering one at
-      // all, not on it being honest once offered.
+      // A seal that was OFFERED and does not verify is a refusal. The gate is on
+      // offering one at all, not on it being honest once offered.
       origin = { status: 'fail', problems: [`the seal does not verify — ${sealVerdict.reason ?? 'no reason given'}`] }
       refuse('origin', origin.problems)
     }
   }
 
-  return {
-    admitted: refusedAt === undefined,
-    ...(refusedAt === undefined ? {} : { refusedAt }),
-    reasons,
-    package: inspection,
-    ...(tree === undefined ? {} : { tree }),
-    capabilities,
-    origin,
-    ...(sealVerdict === undefined ? {} : { seal: sealVerdict }),
-  }
+  return finish()
 }
