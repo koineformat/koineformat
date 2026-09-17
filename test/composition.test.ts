@@ -355,10 +355,19 @@ describe('B4 — one call composes the five checks, and names the one that refus
     expect(verdict.refusedAt).toBe('integrity')
   })
 
-  it('carries every sub-verdict through, so nothing is hidden behind the first refusal', async () => {
+  it('names the steps it did NOT run, rather than omitting them', async () => {
+    // This test asserted `verdict.tree?.integrity.status === 'pass'` until B12,
+    // which is to say it encoded the defect: the semantic checks ran after a
+    // capability refusal, producing verdicts the reader was not entitled to.
+    // They no longer run — and the skip is NAMED, because a verdict that simply
+    // omitted them would read, at every call site, exactly like one where they
+    // passed.
     const verdict = await admitPackage(await pkg({ requires: ['locator'] }), { implements: [] })
+    expect(verdict.refusedAt).toBe('capabilities')
+    expect(verdict.notRun).toEqual(['schema', 'references', 'completeness', 'origin'])
+    expect(verdict.tree).toBeUndefined()
+    // What WAS established before the refusal is still carried through.
     expect(verdict.package.status).toBe('ok')
     expect(verdict.capabilities.missing).toEqual(['locator'])
-    expect(verdict.tree?.integrity.status).toBe('pass')
   })
 })

@@ -9,10 +9,19 @@
  * roundtrip test re-emitted the original input rather than what it had parsed,
  * so the only path a foreign consumer ever walks was never walked here.
  *
- * Turning the first consumer's criteria into the standard's conformance suite is
- * the cheapest independent second-implementation pressure there is: the person
- * who has to USE the form writes the tests, and nobody who built it gets to
- * choose what counts as working.
+ * **What these are, precisely — corrected 2026-09-17 at the reviewer's request,
+ * and the correction is the point.** They are UPSTREAM tests, written here,
+ * against this codec, by its editors, on the basis of a prospective consumer's
+ * published criteria. They are **not a passed acceptance** — nobody has accepted
+ * anything — and they are **not a second independent implementation**. Borrowing
+ * a reviewer's criteria does not borrow their independence.
+ *
+ * Their value is real and smaller than the first sentence here used to claim:
+ * the criteria are EXTERNAL, so they test compositions rather than the shapes
+ * their author already had in mind. Two further review rounds found twelve more
+ * defects while these tests were green, which measures exactly how much they
+ * prove. The declared negative population lives in `negative-vectors.test.ts`;
+ * that is the half a second implementation can check itself against.
  *
  * | criterion | what it demands |
  * |---|---|

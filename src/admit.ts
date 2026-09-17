@@ -33,10 +33,10 @@
 
 import { checkCapabilities, type CapabilityCheck } from './capabilities.js'
 import { inspectFiles, type PackageInspection } from './core/verify.js'
-import { verifySeal, type SchnorrVerify, type SealVerdict } from './seal.js'
+import { manifestPapers, packageSubject, verifySeal, type SchnorrVerify, type SealVerdict } from './seal.js'
 import { parseKoineTree, verifyKoineTree, KOINE_DIR } from './tree.js'
 import type { KoineDsseEnvelope, KoineSealSubject } from './seal.js'
-import type { KoineVerdict, KoineVerifyResult } from './types.js'
+import type { KoineContentHash, KoineVerdict, KoineVerifyResult } from './types.js'
 
 /** Which step refused. `undefined` when nothing did. */
 export type AdmissionStep =
@@ -62,12 +62,32 @@ export interface AdmitOptions {
    * A seal that travelled beside the package, and the curve operation to check
    * it with. Absent means no seal was offered — origin stays `not-established`,
    * which does not refuse: the seal is additive, never a gate (§6.2).
+   *
+   * **There is no `subject` field, and its absence is the fix for B8.** This
+   * used to take one from the caller and never connect it to the package it had
+   * just read, so `admitPackage(filesB, { seal: sealOfA, subject: subjectOfA })`
+   * returned `admitted: true` with a genuine signature over a different package.
+   * The subject is now DERIVED from the manifest this function read — which is
+   * the rule `verifySeal`'s own docblock states and this function broke one
+   * layer up: *a verifier that took the subject from the seal would be checking
+   * the seal against itself.* Taking it from the caller is the same error with a
+   * longer path.
+   *
+   * An API that cannot express the mistake needs no test against it; the
+   * negative vector below exists anyway, because the shape recurs.
    */
   readonly seal?: {
     readonly envelope: KoineDsseEnvelope
-    readonly subject: KoineSealSubject
     readonly verify: SchnorrVerify
   }
+  /**
+   * OPTIONAL, and never a substitute for derivation: what the caller expected
+   * the package subject to be. When given it is compared against the derived
+   * one, so a consumer holding a pinned expectation learns that the package
+   * moved — a different guarantee from the signature's, and worth having beside
+   * it.
+   */
+  readonly expectedSubject?: KoineSealSubject
 }
 
 export interface AdmissionVerdict {
@@ -84,6 +104,15 @@ export interface AdmissionVerdict {
   readonly origin: KoineVerdict
   /** The seal's own verdict, when one was offered. */
   readonly seal?: SealVerdict
+  /**
+   * Steps that did NOT run, because an earlier one refused and running them
+   * would have produced an opinion the reader was not entitled to.
+   *
+   * Present only when something was skipped. It exists so that no caller infers
+   * a pass from an absence: a verdict that simply omitted the later steps would
+   * read, at every call site, exactly like one where they passed.
+   */
+  readonly notRun?: readonly AdmissionStep[]
 }
 
 const NOT_CHECKED = (why: string): KoineVerdict => ({ status: 'not-established', problems: [why] })
@@ -135,20 +164,57 @@ export async function admitPackage(
   }
 
   // ── 2. what this reader must understand, before it understands anything ────
+  //
+  // **B12.** A malformed sidecar reached here as an uncaught `KoineParseError`,
+  // so a caller asking *may I admit this* got an exception instead of a refusal
+  // — and an exception is not a verdict: it has no step, no reasons, and every
+  // catch site invents its own meaning for it.
+  const hasTree = files.has(`${KOINE_DIR}/nodes.jsonl`)
+  let treeRequires: readonly string[] = []
+  if (hasTree) {
+    try {
+      treeRequires = parseKoineTree(files).requires
+    } catch (error) {
+      return {
+        admitted: false,
+        refusedAt: 'envelope',
+        reasons: [`the koine tree does not parse — ${error instanceof Error ? error.message : String(error)}`],
+        package: inspection,
+        capabilities: { honoured: false, missing: [] },
+        origin: NOT_CHECKED('the tree did not parse'),
+      }
+    }
+  }
   const declared = [
     ...((inspection.manifest as { requires?: string[] } | undefined)?.requires ?? []),
-    ...(files.has(`${KOINE_DIR}/nodes.jsonl`) ? parseKoineTree(files).requires : []),
+    ...treeRequires,
   ]
   const capabilities = checkCapabilities([...new Set(declared)], options.implements)
   if (!capabilities.honoured) {
     refuse('capabilities', capabilities.missing.map(
       token => `this reader does not implement "${token}", which the package requires (SPEC §8.1)`,
     ))
+    // **B12, and it is the sharper half.** This function's own docblock said
+    // capabilities refuse BEFORE any semantic check — and the code ran the
+    // semantic checks anyway. A reader that lacks a required capability must not
+    // form an opinion about the content at all, because its opinion is exactly
+    // the guess §8.1 forbids; continuing produced verdicts nobody was entitled
+    // to. The steps that did not run are NAMED, so a `pass` is never inferred
+    // from an absence.
+    return {
+      admitted: false,
+      refusedAt: 'capabilities',
+      reasons,
+      notRun: ['schema', 'references', 'completeness', 'origin'],
+      package: inspection,
+      capabilities,
+      origin: NOT_CHECKED('the reader lacks a required capability, so nothing downstream was checked'),
+    }
   }
 
   // ── 3 & 4. the meaning layer, when the archive carried one ─────────────────
   let tree: KoineVerifyResult | undefined
-  if (files.has(`${KOINE_DIR}/nodes.jsonl`)) {
+  if (hasTree) {
     tree = await verifyKoineTree(files)
     if (tree.integrity.status === 'fail') refuse('integrity', tree.integrity.problems)
     if (tree.schema.status === 'fail') refuse('schema', tree.schema.problems)
@@ -167,8 +233,25 @@ export async function admitPackage(
   let origin: KoineVerdict
   if (options.seal === undefined) {
     origin = NOT_CHECKED('no seal was offered with this package — origin is unproven, not unsound (SPEC §6.2)')
+  } else if (inspection.manifest === undefined) {
+    origin = NOT_CHECKED('the manifest did not read, so no subject could be derived to check the seal against')
   } else {
-    sealVerdict = await verifySeal(options.seal.envelope, options.seal.subject, options.seal.verify)
+    // DERIVED, never accepted. The subject is what THIS package is, computed
+    // from the manifest this function read — name, version, root hash, and a
+    // digest over the papers (§6.3). A seal made over any other package now
+    // fails as `subject-mismatch`, which is what B8 reported it did not.
+    const manifest = inspection.manifest as unknown as Record<string, unknown>
+    const derived = packageSubject(
+      manifest['name'] as string,
+      manifest['version'] as string,
+      manifest['integrity'] as KoineContentHash,
+      await manifestPapers(manifest),
+    )
+    if (options.expectedSubject !== undefined
+      && JSON.stringify(options.expectedSubject) !== JSON.stringify(derived)) {
+      refuse('origin', ['the package is not the one the caller expected to be sealed'])
+    }
+    sealVerdict = await verifySeal(options.seal.envelope, derived, options.seal.verify)
     if (sealVerdict.valid) {
       origin = { status: 'pass', problems: [] }
     } else {

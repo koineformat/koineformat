@@ -614,6 +614,13 @@ A seal binds to content through hashes the tree already carries:
    whoever reads it, so a digest over an unsorted projection would break on a reformat and train
    readers to ignore it.
 
+   **A verifier DERIVES the subject from the artifact it is checking.** It MUST NOT accept one
+   from its caller and MUST NOT read one out of the seal. Both are the same error: a seal
+   checked against a subject it was handed proves that *some* package was signed, never that
+   *this* one was — a genuine signature over one package will admit another, which is exactly
+   what a composed API did until this revision. A caller's expectation may be compared against
+   the derived subject; it may never stand in for it.
+
 ### 6.4 The envelope — a DSSE-compatible profile
 
 The seal travels as a detached JSON sidecar (`<file>.seal.json` beside a standalone file; the
@@ -735,6 +742,13 @@ The certificate is itself a DSSE envelope, `payloadType`
 ```
 
 signed by the **human's** key over its own PAE, exactly as a seal is.
+
+**Structure before semantics.** A verifier MUST establish that `author`, `agent` and `by` are
+well-formed `actor:(user|agent):<id>` strings BEFORE reasoning about what they mean, and MUST
+refuse — never throw, never ignore — when one is not. An implementation that pattern-matched a
+prefix accepted every actor string that matched no prefix at all, and crashed on an absent one;
+neither is a verdict. And the mandate's `by` MUST be a **person**: a certificate signed by
+another agent is a chain with nobody at the end of it, and it verified.
 
 **The certificate is REQUIRED for an agent author, not merely checked when present.** A verifier
 MUST refuse a seal whose `author` begins `actor:agent:` and which carries no `delegation` — an
@@ -1335,6 +1349,17 @@ undocumented behaviour; none is normative here:
 `team-decisions/conventions.md`:
 
 ```markdown
+# Conventions
+
+- Never deploy on Friday. See incident #44.
+- Every architectural decision gets an ADR in `decisions.md`.
+```
+
+`team-decisions/.koine/nodes.jsonl` — the identity map the seal computed (ids minted at
+seal), covering both bodies. `readingFloor: 0` declares the bodies self-sufficient: a bare
+agent reads `conventions.md` and is done; the sidecar and the papers are for whoever must
+*trust* the copy.
+
 ### 7.15 The reference import flow — the composition, and what it does not decide
 
 The checks in this standard answer different questions and a consumer needs them composed, in
@@ -1356,23 +1381,23 @@ single call**, and this one does (`admitPackage`):
 The verdict names the FIRST step that refused and carries every sub-verdict unmodified, so
 nothing hides behind the first answer.
 
+**A refusal STOPS the flow, and the steps that did not run are named.** A reader that lacks a
+required capability must not go on to judge the content — its judgement would be the guess §8.1
+forbids — so the later steps do not run, and the verdict says which. Omitting them instead would
+read, at every call site, exactly like a verdict where they passed. **A step that did not run and
+a step that passed must never be spelled the same way**, which is §3.5's rule for verdicts applied
+to a sequence of them.
+
+**A malformed artifact is a verdict, not an exception.** A sidecar that does not parse yields a
+refusal with a step and reasons; a thrown error has neither, and every catch site invents its own
+meaning for it.
+
 **What it does not decide, stated because a composed `true` invites the assumption:** admission
 is not activation. Whether the publisher is trusted, whether the licence permits the use, what
 the declared status source says today (§7.3 — fetching it is the consumer's act, not the
 format's), and whatever the domain requires on top are the application's, and no verdict here
 speaks for them. **Not every function must do every job; no function's result may suggest a
 success wider than the question it asked.**
-
-# Conventions
-
-- Never deploy on Friday. See incident #44.
-- Every architectural decision gets an ADR in `decisions.md`.
-```
-
-`team-decisions/.koine/nodes.jsonl` — the identity map the seal computed (ids minted at
-seal), covering both bodies. `readingFloor: 0` declares the bodies self-sufficient: a bare
-agent reads `conventions.md` and is done; the sidecar and the papers are for whoever must
-*trust* the copy.
 
 ## 8. Extension profiles
 
@@ -1610,6 +1635,41 @@ and for a year it did not.
 ---
 
 ## Changelog
+
+### 2026-09-17 (third round) — the defect in the repair of the repair
+
+The second round's repairs shipped as 0.7.0. The same reviewer returned within hours with **five
+more findings**, two of them P1 — and the two P1s were in code written that afternoon *to close
+the composition hole the second round reported*.
+
+- **A genuine seal over package A admitted package B.** `admitPackage` accepted the seal's
+  SUBJECT from its caller and never bound it to the package it had just read. The crypto was
+  sound; the composition simply never connected the claim to the artifact. §6.3 now says it
+  normatively: **a verifier DERIVES the subject and MUST NOT accept one**, because a seal checked
+  against a handed-in subject proves that *some* package was signed, never that *this* one was.
+  The API no longer has the field.
+- **Canonicalization silently dropped a legal JSON key.** The projection accumulated into a `{}`,
+  and assigning `__proto__` sets a prototype rather than an own property — so two manifests that
+  differ produced one digest and a real signature stayed valid across a real change. The repair
+  is not *handle `__proto__`*: the canonicalization now **serializes directly from sorted pairs**,
+  with no object model between the data and the bytes, because a canonicalization whose
+  correctness depends on which key names the host treats as special is not canonical.
+- **The actor grammar was never checked** (§6.7): a mandate signed by another *agent* was accepted
+  — a chain of mandate with no person at the end of it — an author that was not an actor at all
+  passed every prefix test, and a missing author threw. Structure is established before semantics
+  now, and each case has a named refusal.
+- **A version suffix was parsed and then ignored**, so `metric@v999` resolved to `metric@v0`. A
+  suffix that is read and discarded is worse than one that is not read: it reads as agreement.
+- **The documented order was not the implemented order.** §7.15 said capabilities refuse *before*
+  any semantic check and the code ran them anyway; a malformed sidecar escaped as an uncaught
+  parse error. Both repaired, and the chapter now states the rule the omission taught: **a step
+  that did not run and a step that passed must never be spelled the same way.**
+
+**The pattern across all three rounds, since it is now measurable.** Of twelve findings, **six**
+are one shape — a verifier trusting a fact it should have derived — and **four** are another —
+two representations of one fact with nothing holding them together. Both are recorded as rules in
+[`REGISTER.md`](REGISTER.md), and the negative population they imply now ships as a declared
+category of conformance vector rather than as this project's own positive fixtures.
 
 ### 2026-09-17 (later the same day) — what an outside review found in the repair
 

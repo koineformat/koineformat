@@ -78,7 +78,7 @@ describe('B5 — the proposal’s declared target and schema are actually used',
     const { files, tree } = await treeAt('current-name.md')
     const receipt = receiveProposal(await proposal({ schema: 'koine/types/other@v0' }), tree, files)
     expect(receipt.status).toBe('invalid')
-    expect(receipt.problems.join(' ')).toContain('one of the two is wrong')
+    expect(receipt.problems.join(' ')).toContain('is addressed as')
   })
 
   it('binds acceptance to the RESOLVED path when the document was renamed', async () => {

@@ -39,6 +39,9 @@
  */
 
 import { sha256Bytes, sha256Hex } from './sha256.js'
+// ONE canonicalization for the whole package — a manifest digest and a `const`
+// comparison that disagree about what a JSON value IS are two bugs waiting.
+import { canonicalJson } from './schema.js'
 import type { KoineContentHash } from './types.js'
 
 /** The DSSE `payloadType` of a koine seal. */
@@ -241,6 +244,10 @@ export function readSealPayload<T>(envelope: KoineDsseEnvelope): T {
 /** Why a seal did not verify — machine-readable, so a surface can say which step failed. */
 export type SealFailure =
   | 'malformed'
+  /** An actor string that is not `actor:(user|agent):<id>`, or is absent. */
+  | 'malformed-actor'
+  /** A delegation whose `by` is not a person — a chain of mandate with nobody at the end. */
+  | 'delegation-not-human'
   /** An `actor:agent:` author with no delegation certificate — §6.7 requires one. */
   | 'delegation-missing'
   | 'wrong-payload-type'
@@ -256,6 +263,17 @@ export interface SealVerdict {
   readonly reason?: SealFailure
   /** The authenticated payload — present only when `valid`. */
   readonly payload?: KoineSealPayload
+}
+
+/**
+ * `actor:(user|agent):<id>` — the one actor grammar this standard uses, checked
+ * rather than pattern-matched at each site. `role` narrows it when only one kind
+ * of actor is admissible.
+ */
+function isActor(value: unknown, role?: 'user' | 'agent'): boolean {
+  if (typeof value !== 'string') return false
+  const match = /^actor:(user|agent):(.+)$/.exec(value)
+  return match !== null && match[2] !== '' && (role === undefined || match[1] === role)
 }
 
 const sameSubject = (a: KoineSealSubject, b: KoineSealSubject): boolean =>
@@ -299,6 +317,12 @@ export async function verifySeal(
   if (payload.kind !== 'koine/seal@v0' || payload.method !== SEAL_METHOD) {
     return { valid: false, reason: 'wrong-method' }
   }
+  // **B10.** Structure before semantics: `payload.author.startsWith(…)` threw a
+  // TypeError on a payload with no author, and an author like `nonsense` sailed
+  // past every prefix test because it matched none of them. A verifier that
+  // crashes on malformed input has refused nothing, and one that ignores what it
+  // cannot classify has admitted it.
+  if (!isActor(payload.author)) return { valid: false, reason: 'malformed-actor' }
   if (!sameSubject(payload.subject, actualSubject)) return { valid: false, reason: 'subject-mismatch' }
   if (!verify(signature, message, pubkey)) return { valid: false, reason: 'bad-signature' }
 
@@ -315,6 +339,11 @@ export async function verifySeal(
   if (payload.delegation !== undefined) {
     const chain = await verifyDelegation(payload.delegation, verify)
     if (chain.reason !== undefined) return { valid: false, reason: chain.reason }
+    // **B10.** A mandate is a HUMAN vouching for an agent. A certificate whose
+    // `by` is itself an agent is a chain with no person at the end of it, and it
+    // verified: the signature was real, and nothing asked who had signed.
+    if (!isActor(chain.payload?.by ?? '', 'user')) return { valid: false, reason: 'delegation-not-human' }
+    if (!isActor(chain.payload?.agent ?? '', 'agent')) return { valid: false, reason: 'malformed-actor' }
     // The certificate must bind THE key that signed THIS seal, and the agent it
     // speaks for must be the author the seal claims. Without both checks a
     // certificate minted for another agent could be pasted onto this envelope.
@@ -416,22 +445,6 @@ export function manifestPapers(manifest: Readonly<Record<string, unknown>>): Pro
     withoutSignature['provenance'] = rest
   }
   return sha256Hex(encoder.encode(canonicalJson(withoutSignature))).then(hex => `sha256:${hex}`)
-}
-
-/** Recursively sorted, `undefined` dropped — the one canonicalization this chapter needs. */
-function canonicalJson(value: unknown): string {
-  const canonical = (v: unknown): unknown => {
-    if (v === null) return null
-    if (Array.isArray(v)) return v.map(canonical)
-    if (typeof v !== 'object') return v
-    const out: Record<string, unknown> = {}
-    for (const key of Object.keys(v as Record<string, unknown>).sort()) {
-      const inner = (v as Record<string, unknown>)[key]
-      if (inner !== undefined) out[key] = canonical(inner)
-    }
-    return out
-  }
-  return JSON.stringify(canonical(value))
 }
 
 // ---------------------------------------------------------------------------

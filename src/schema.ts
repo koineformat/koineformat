@@ -66,23 +66,33 @@ function typeMatches(declared: string, actual: string): boolean {
 }
 
 /**
- * Canonical JSON: recursively sorted keys, arrays left alone. A shape's key
- * ORDER is not a fact about it — a manifest written by one producer and
- * re-serialized by a reader is the same shape — and an equality that depended on
- * it made `const` reject the very object it names. Reported as B6.
+ * Canonical JSON: recursively sorted object keys, arrays left in order.
+ *
+ * **It builds a STRING, never an object, and that is the whole point.** The
+ * obvious implementation accumulates into a `{}` and hands it to
+ * `JSON.stringify` — and a JavaScript object is not a JSON object. Assigning
+ * `out["__proto__"]` sets the prototype instead of creating an own property, so
+ * a perfectly legal JSON key named `__proto__` VANISHES before the digest is
+ * taken. Two different manifests then produce the same digest and a real
+ * signature stays valid across a real change (B9, reported 2026-09-17).
+ *
+ * `Object.create(null)` would fix that one key. Serializing directly fixes the
+ * class: there is no object model between the data and the bytes, so there is
+ * nothing for the language to reinterpret. A canonicalization whose correctness
+ * depends on which key names the host treats as special is not canonical.
+ *
+ * `undefined` members are dropped — as `JSON.stringify` drops them — so the
+ * projection matches what a round trip through JSON would hold.
  */
 export function canonicalJson(value: unknown): string {
-  const canonical = (v: unknown): unknown => {
-    if (v === null || typeof v !== 'object') return v
-    if (Array.isArray(v)) return v.map(canonical)
-    const out: Record<string, unknown> = {}
-    for (const key of Object.keys(v as Record<string, unknown>).sort()) {
-      const inner = (v as Record<string, unknown>)[key]
-      if (inner !== undefined) out[key] = canonical(inner)
-    }
-    return out
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
+  if (Array.isArray(value)) {
+    return `[${value.map(v => (v === undefined ? 'null' : canonicalJson(v))).join(',')}]`
   }
-  return JSON.stringify(canonical(value))
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`
 }
 
 /** Value equality that ignores object key order — see {@link canonicalJson}. */

@@ -463,13 +463,26 @@ function schemaIdProblem(
   kind: string | undefined,
   tree: ParsedKoineTree,
 ): string | undefined {
-  const match = /^koine\/types\/(.+?)@v\d+$/.exec(schema)
-  const named = match?.[1] ?? schema
-  if (kind !== undefined && named !== kind) {
-    return `the proposal declares schema "${schema}" and changes a body of kind "${kind}" — one of the two is wrong`
+  if (kind === undefined) return 'the proposal\'s resultingShape declares no "kind"'
+  const record = recordSchemaFor(tree, kind)
+  if (record === undefined) {
+    return `the proposal changes a body of kind "${kind}" and this tree carries no such record type`
   }
-  if (recordSchemaFor(tree, named) === undefined) {
-    return `the proposal declares schema "${schema}" and this tree carries no record type "${named}"`
+
+  // **B11.** The declared id must be the record type's ACTUAL id, version and
+  // all. Matching on the name and discarding `@v…` let `metric@v999` resolve to
+  // `metric@v0` — a version suffix that is parsed and then ignored is worse than
+  // one that is not parsed, because it reads as agreement.
+  //
+  // Two ids are admissible, and which one depends on the record type rather than
+  // on the proposer: a schema carrying its OWN `$id` (§2.1, since 0.7.0) is
+  // addressed by it; one carrying none is addressed by koine's stamp. A bare
+  // name is accepted as unambiguous shorthand. Nothing else is.
+  const own = typeof record['$id'] === 'string' ? (record['$id'] as string) : undefined
+  const admissible = own !== undefined ? [own, kind] : [`koine/types/${kind}@v0`, kind]
+  if (!admissible.includes(schema)) {
+    return `the proposal declares schema "${schema}" and the record type "${kind}" in this tree is `
+      + `addressed as ${admissible.map(id => `"${id}"`).join(' or ')}`
   }
   return undefined
 }

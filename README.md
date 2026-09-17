@@ -23,8 +23,15 @@ Each floor is fully worth consuming without the ones above it — a bare file tr
 ## What no borrowed carrier gives you
 
 **A history nobody can take from you.** Every holder of a koine repo carries the full history;
-the origin cannot rewrite it. Verification needs no server, no account, no tooling — a few
-lines of any language recompute the chain (see the algorithm in [SPEC.md](SPEC.md)).
+the origin cannot rewrite it without breaking a chain any second holder's copy exposes.
+Verification needs no server, no account, no tooling — a few lines of any language recompute the
+chain (see the algorithm in [SPEC.md](SPEC.md)).
+
+**What that does and does not claim.** The chain proves ORDER and INTEGRITY of the commits a tree
+carries; it does not prove authorship (chapter 6 does), and it does not carry the content each
+commit was about — `commit.node` binds a commit to a body, not to a version of it, so *what did
+this say when that claim was made* is a question the form cannot yet answer. That is an open
+entry in the [register](REGISTER.md), not a footnote.
 
 ## How it travels
 
@@ -88,8 +95,14 @@ shape a directory walk produces. The one host capability needed is WebCrypto
 which is why hashing is async throughout.
 
 **The vendor eats its own form.** NoeBase's machine imports this exact package at every boundary
-where knowledge leaves or enters it. There is no second, internal codec: what the standard says
-and what the product does cannot drift apart, because they are one build.
+where knowledge leaves or enters it. There is no second, internal codec, so the standard and the
+product cannot drift apart **in the sense that matters for a consumer**: they are one build, and
+a defect in the form is a defect in the product the same day.
+
+It does not mean the implementation is ahead of its own specification. Three rounds of outside
+review in two days found twelve defects between what this document declares and what the code
+did, every one reproduced against a published release — which is why the
+[register](REGISTER.md) is the honest surface for *what is open* and this page is not.
 
 ## Status
 

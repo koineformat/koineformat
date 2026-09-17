@@ -25,7 +25,7 @@ keep resolving — and points here.
 | **blocked-on** | entry ids, or `trigger:"<falsifiable event>"` |
 | **verified** | the last date the claim was checked **against the code**, not against this file |
 
-**Three rules, all learned the hard way.**
+**Four rules, all learned the hard way.**
 
 1. **A gap whose closing condition is an extraction names the artifact it will extract FROM,
    and checks that it exists.** Declared gap 2 waited a year to be *"extracted from the
@@ -35,7 +35,14 @@ keep resolving — and points here.
 2. **A finder without a declared population is an opinion.** Each of the three structural
    guards in [`test/guards.test.ts`](test/guards.test.ts) names its population: sections with
    normative language · every `§` any source or test cites · the canonical emission's bytes.
-3. **A law with two enforcers is a law with a hole in it.** Seven of the nine defects found by
+3. **A verifier DERIVES what it checks and is TOLD only what it checks against.** Six of the
+   twelve findings across three rounds were this one shape: the subject taken from the caller
+   (B8), the papers reduced to three fields (B3), the write target taken from the proposal rather
+   than resolved (B5), the mandate checked only where one already was (B2), the actor trusted
+   without being validated (B10), the id matched without its version (B11). The fix is a TYPE,
+   not a docblock — `admitPackage` no longer accepts a subject at all, and an API that cannot
+   express the mistake needs no rule against it.
+4. **A law with two enforcers is a law with a hole in it.** Seven of the nine defects found by
    outside review lived BETWEEN the pieces, not inside them — the travel law held in
    `emitKoineTree` and not in `sealPackage`, a capability could be named and never refused, a
    verifier checked a mandate only where one already was. Every piece was green. **A new law
@@ -162,6 +169,29 @@ naming it. *"Freitext ohne Objektbindung/ID bleibt unklassifizierbar"* — so a 
 mechanical for what is bound and a judgment call for what is written, and the form does not say
 which it guarantees.
 
+### KF-20260917-absent-body-has-no-resolver
+**status:** open · **opened:** 2026-09-17 · **verified:** 2026-09-17
+**receipt:** a fixture in which a receiver proves it holds the exact referenced bytes of a
+required-absent body, and the package's seal and pin are untouched by the proof
+**blocked-on:** []
+
+**Raised by the 2026-09-17 review as the next contract question, and it is the right one.** A
+package may declare a body it does not carry, with that body's digest (§3.2). A receiver that
+obtains the bytes elsewhere can check them — and has **no way to say so**. `admitPackage` offers
+no resolver, so `status: incomplete` is permanent from the package's point of view however
+completely the receiver has solved it locally.
+
+**The trap the question already names, and the reason this is a contract and not a feature.**
+Adding the body and re-sealing produces a NEW package: a new root hash, a new manifest digest, a
+new subject, and the old signature no longer applies. That is correct behaviour and it is not
+evidence retrieval — and it **must not silently replace the old pin**, or a consumer's lockfile
+would quietly come to mean a different artifact than the one it recorded.
+
+So the shape is a third thing: a *local availability proof* that is checked against the
+declaration and stays outside the sealed bytes. Where it lives — a lockfile field, a resolver
+handed to `admitPackage`, or wholly the consumer's with only the rule written here — is the open
+question. The form owes a declaration; whether it owes the verb is what this entry decides.
+
 ---
 
 ## Closed
@@ -179,8 +209,13 @@ which it guarantees.
 | **KF-20260917-B2-agent-without-mandate** | 2026-09-17 — an `actor:agent:` author with no delegation certificate verified `valid: true`; §6.7 now requires the mandate and `verifySeal` answers `delegation-missing` |
 | **KF-20260917-B3-seal-misses-the-papers** | 2026-09-17 — the package subject was `{name, version, integrity}` and the root hash excludes `koine.json`, so licence, source, terms, `requires` and `status` were unsigned. `packageSubject` now binds `papers`, a digest over the manifest less its own signature |
 | **KF-20260917-B4-no-composed-contract** | 2026-09-17 — the checks existed and nothing composed them, so a required capability could be *named* and never *refused*. New §7.15 and `admitPackage` |
-| **KF-20260917-B5-proposal-target-and-schema** | 2026-09-17 — the declared `schema` id was never read, and acceptance wrote to the drafted path after a rename. Both refused now; the receipt reports the resolved target |
+| **KF-20260917-B5-proposal-target-and-schema** | 2026-09-17 — the declared `schema` id was never read, so a proposal naming a record type that does not exist received `ready`; that is refused now. The rename half is **resolved rather than refused**: an id outlives a path, so the receiver reports `resolved: {nodeId, path, renamed}` and `acceptProposal` REQUIRES that path — the write target is the one the receiver resolved, never the one the proposal was drafted against |
 | **KF-20260917-B6-schema-subset-conformance** | 2026-09-17 — a boolean is a schema (three keywords inverted, two failing open), and `const`/`enum` compared serialized key order |
+| **KF-20260917-B8-seal-of-a-vouches-for-b** | 2026-09-17 — `admitPackage` took the seal's SUBJECT from its caller and never bound it to the package it had just read, so a genuine signature over package A admitted package B. The subject is derived from the read manifest now; an `expectedSubject` may be compared beside it but never substituted for it |
+| **KF-20260917-B9-canonicalization-lost-a-key** | 2026-09-17 — the canonical projection built a `{}`, and assigning `__proto__` sets a prototype rather than an own property, so a legal JSON key vanished before the digest: two different manifests, one digest, a real signature valid across a real change. Canonicalization now serializes directly from sorted pairs — no object model between the data and the bytes |
+| **KF-20260917-B10-actor-grammar-unchecked** | 2026-09-17 — a mandate signed by another AGENT was accepted (a chain with no person at the end), an author that was not an actor at all passed every prefix test, and a missing author threw a `TypeError`. Structure is validated before semantics, and each case has a named refusal |
+| **KF-20260917-B11-version-suffix-ignored** | 2026-09-17 — `metric@v999` resolved to `metric@v0` because the id was matched on its name and the version discarded. The whole id is compared, and a record type carrying its own `$id` is addressed by it |
+| **KF-20260917-B12-order-documented-not-implemented** | 2026-09-17 — `admitPackage`'s docblock said capabilities refuse *before* any semantic check and the code ran them anyway; a malformed sidecar escaped as an uncaught `KoineParseError`. The order is the code's now, skipped steps are NAMED in `notRun`, and a parse failure is a verdict |
 | **KF-20260917-B7-schema-id-substituted** | 2026-09-17 — the emitter accepted a foreign `$id` and the parser stripped it, so a re-emit substituted koine's. §2.1 now says the FILENAME binds and the author's `$id` travels |
 
 ---
