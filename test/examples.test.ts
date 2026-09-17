@@ -53,7 +53,16 @@ const text = (value: Uint8Array | string): string => (typeof value === 'string' 
 
 describe('examples/own-docs — the codec against a tree it did not write', () => {
   it('verifies every content hash and the whole chain', async () => {
-    expect(await verifyKoineTree(await readTree(ROOT))).toEqual({ ok: true, problems: [] })
+    const verdict = await verifyKoineTree(await readTree(ROOT))
+    expect(verdict).toMatchObject({ ok: true, problems: [] })
+    // Four questions, four answers. Three pass on this tree; the fourth is the
+    // one the form owed itself — `not-established` says nobody vouched, which
+    // is a different fact from "checked and fine" and used to be spelled the
+    // same way.
+    expect(verdict.integrity.status).toBe('pass')
+    expect(verdict.schema.status).toBe('pass')
+    expect(verdict.references.status).toBe('pass')
+    expect(verdict.origin.status).toBe('not-established')
   })
 
   it('convicts the tree when one body byte moves', async () => {

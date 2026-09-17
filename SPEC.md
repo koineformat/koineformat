@@ -167,6 +167,34 @@ its own body. Grammar:
 - **`kind` is required** and names the record type; the declared schema lives at
   `.koine/types/<kind>.schema.json`. The parsed block MUST validate against it — this is
   the parse that receipt steps 3 and 4 (chapter 5) perform.
+- **`state` is reserved** and, when present, declares the body's position on the validity
+  gradient (chapter 4). It MUST be one of `spoken` · `draft` · `valid` · `frozen`.
+
+**The block is a text serialization of a typed record, and the whole block is the
+instance.** Two consequences a validator MUST implement, because leaving either implicit
+made the rule above unsatisfiable rather than strict:
+
+- **Values are coerced to the type the record type declares** before validation — a
+  declaration reads `window: 90`, and a schema saying `{"type":"integer"}` sees the number
+  `90`. Without coercion no record type with a non-string field could be declared in a shape
+  block at all. A value that cannot be coerced is validated as the string it is, so the
+  verdict names the field instead of failing as a parse error with nothing attached to it.
+- **`kind` and `state` are part of the validated instance, not hidden from it.** A record
+  type MAY constrain them (the worked `metric-definition` pins `kind` with `const` and
+  `state` with an `enum`, and requires both), and a record type that closes itself with
+  `additionalProperties: false` MUST admit them. A codec that quietly removed two keys before
+  validating would make a closed schema's verdict a lie about what the body carries.
+
+**The JSON Schema keywords a conformant validator asserts on** — declared, so that two
+implementations agree on what *validates* means: `type` · `const` · `enum` · `required` ·
+`properties` · `additionalProperties` (boolean) · `items` · `minItems` · `maxItems` ·
+`minimum` · `maximum` · `exclusiveMinimum` · `exclusiveMaximum` · `minLength` · `maxLength` ·
+`pattern` · `anyOf` · `oneOf` · `allOf` · `not` · `if`/`then`/`else`. An unrecognized keyword
+is IGNORED, per JSON Schema's own rule and chapter 8's. `$ref` and every form of schema
+reuse, `dependentSchemas`, `dependentRequired`, `patternProperties`, `propertyNames`,
+`unevaluated*`, and `format` as an assertion are **outside** this profile; a record type that
+needs them is outside the shape block's reach, and saying so is cheaper than a reference
+implementation that carries a general validator.
 
 **One filename, one definition.** `types/<name>.schema.json` may be claimed either by a
 free-standing record type (§2.1) or by a kind that declares a payload shape — a kind that
@@ -196,13 +224,49 @@ and only the edge *type* (§2.1) is vocabulary.
 ### 3.2 `nodes.jsonl` and `edges.jsonl` — identity and the asserted graph
 
 - **`nodes.jsonl`** — the identity map. One JSON object per line:
-  `{"id", "path", "format", "contentHash"}`. `id` is stable across renames; `contentHash` is
-  `"sha256:" + lowercase-hex sha256 of the file's exact bytes`. No id scheme is prescribed —
-  only that an id outlives a path.
+  `{"id", "path", "format", "contentHash", "state"?}`. `id` is stable across renames;
+  `contentHash` is `"sha256:" + lowercase-hex sha256 of the file's exact bytes`. No id scheme
+  is prescribed — only that an id outlives a path.
+
+  **`state` is how validity travels** (chapter 4). A body DECLARES its state in its shape
+  block; the identity map is where that declaration crosses the boundary, because a receiver
+  cannot be asked to parse every format in the world to learn whether a body may be
+  republished. Where a body declares a state the two MUST agree, and a tree in which they
+  disagree fails verification (§3.5): one body cannot be in two states. Where a body declares
+  none — most bodies are not definitions — the identity map is the state's only carrier and
+  that is correct, not a shortfall. **The key is omitted when the body is on no gradient at
+  all**, and absent is NOT the same fact as `"state":"spoken"`; chapter 4's travel law turns
+  on exactly that difference.
+
 - **`edges.jsonl`** — the typed graph slice: `{"from", "to", "type"}` over node ids; `type`
   names an edge type declared in `types/`. An edge a reader can recompute from the bodies (a
   wiki-style link, for instance) is an index rather than truth, and an emitter MAY omit it;
   an **asserted** edge, which no body implies, has nowhere else to live and belongs here.
+
+  Seven optional facets may follow, each omitted when absent (§1.4), so that a three-key line
+  written before they existed re-emits byte-for-byte and a reader that understands none of
+  them still reads a correct edge:
+
+  | facet | what it carries |
+  |---|---|
+  | `fromLocator` · `toLocator` | where that end LANDS inside its body, and against which version — §3.4 |
+  | `actor` | who asserted it, as `actor:(user\|agent):<id>` — the spelling §3.3 uses |
+  | `when` | when it was asserted; ISO-8601 **UTC (`Z`)** |
+  | `validFrom` · `validTo` | the interval the assertion is held to be true; `validTo` absent means still held |
+  | `weight` | a number — the **instance carrier** for the `weight` *semantics* its edge type declares (§2.1) |
+
+  **`actor`, `when` and the interval are what make an assertion one**, and an emitter that
+  knows them SHOULD carry them; they are optional only because requiring them would make
+  every emitter fabricate what it was never told. **`weight` closes a half-law**: the edge
+  type dictionary has declared weight semantics since this document's first version and no
+  travelling edge could carry a weight — a meaning that could never be exercised. The
+  dictionary says what a weight MEANS; the instance says what it IS. Removing the declared
+  meaning to match the missing field was the other available repair, and it is never the
+  right one.
+
+  A **free-form payload on an edge is deliberately absent.** A relation that needs its own
+  fields is reified as a body and pointed at, which this form already expresses and which
+  needs no new law.
 
 **The digest spelling is `sha256:<hex>` — everywhere in this standard.** Per-file
 checksums over a file tree are eight-year-old, RFC-numbered prior art, and this profile
@@ -215,8 +279,18 @@ read (§7.11).
 ### 3.3 The memory — `.koine/history/`
 
 - **`commits.jsonl`** — attributed semantic commits, one per line:
-  `{"seq", "actor", "what", "why", "when"}`. `actor` is `actor:(user|agent):<id>`; `when` is
-  ISO-8601 **UTC (`Z`)** — no other timezone form is valid.
+  `{"seq", "actor", "what", "why", "when", "node"?}`. `actor` is `actor:(user|agent):<id>`;
+  `when` is ISO-8601 **UTC (`Z`)** — no other timezone form is valid.
+
+  **`what` is prose, and a conformant reader never parses it as an identifier.** A producer
+  saying WHICH body a commit touched says it in **`node`**, by id, against the identity map —
+  the declared binding between the memory and the tree it remembers. Absent means the commit
+  is about the tree rather than about one body (a release, a rename sweep, a dictionary
+  change). The field is single: a commit touching several bodies is several commits, and that
+  is what gives the frozen-slice filter (§7.6) one unambiguous question to ask of each line.
+  Before this binding existed the only place to express it was `what`, where no foreign
+  reader can tell an id from a sentence — and where a frozen slice then carried it past the
+  gate.
 - **`chain.jsonl`** — the Merkle chain. Line 1 is a header declaring `format` and `algo`.
   Then one link per commit: `{"seq", "commit", "prev", "hash"}`.
 
@@ -238,11 +312,100 @@ packaging standard carries, and what this floor authors, is the **attributed sem
 history**: commits that record *who* changed *what* and *why*, under links that make the
 record tamper-evident. OCFL versions bytes; this floor versions meaning, with names on it.
 
+### 3.4 The Locator — addressing a PART, and saying which version
+
+An edge endpoint names a body. A **Locator** says where inside that body the end lands, and
+**against which version it landed** — so that knowledge which is ABOUT something can travel
+at all: an annotation, a citation, a measurement, a finding with its evidence. Without it
+every such claim crosses at whole-body grain, and a link-rot check over a forty-page document
+can report only *this document has a dead link*.
+
+```jsonc
+{"from":"n-claim","to":"n-source","type":"supports",
+ "toLocator":{"contentHash":"sha256:<hex>","selector":{"type":"page","number":14}}}
+```
+
+- **`contentHash` is REQUIRED**, and it is the whole reason this shape earns its place. Every
+  anchor vocabulary in the field resolves a pointer against whatever the body says today;
+  when the body is replaced the pointer still resolves and now names something else —
+  silently. With the hash inside the Locator a receiver can answer *"this was taken against a
+  version you no longer hold"*, which is the honest answer and the one nobody can give
+  without it. A Locator without it is not one.
+- **`selector` is OPTIONAL.** A Locator with none addresses the whole of *that version* — a
+  version-pinned whole-body reference, which is a real thing to want.
+
+**This is not a new kind of thing, and not a fifth dictionary.** An edge type says what a
+relation MEANS and what it admits at each end; a Locator says where an end LANDS. A form with
+every edge type in the world and no Locator still cannot say *page 14*.
+
+**The selector vocabulary is CLOSED — six types.** Each is taken from the field rather than
+invented, and each was chosen by measuring the formats knowledge actually travels in.
+
+| `type` | fields | prior art | the formats it serves | how it degrades when the body moves |
+|---|---|---|---|---|
+| `text-quote` | `exact`, `prefix`?, `suffix`? | W3C Web Annotation `TextQuoteSelector` | every text format | **the only one that survives an edit** — it re-anchors by search. Ambiguous without context, and a reader MUST report ambiguity rather than pick |
+| `text-position` | `start`, `end` — half-open, in **Unicode code points** | W3C Web Annotation `TextPositionSelector` | every text format | exact and brittle: any edit before the region shifts it. The Locator's `contentHash` is what convicts that |
+| `line-range` | `start`, `end`? — **1-based, inclusive** | the concept is RFC 5147's `#line=` | source, plaintext, jsonl, transcripts | shifts like a position, at line grain; a reformat that preserves lines survives it |
+| `page` | `number` — 1-based | the page itself | pdf | stable within a version, meaningless across a re-export |
+| `time-range` | `start`, `end`? — seconds | W3C Media Fragments `#t=` | audio, video | stable unless the media is re-encoded against a different origin |
+| `json-pointer` | `pointer` — RFC 6901 | RFC 6901 | json, yaml, toml, tabular bodies, a shape block | **survives reformatting**; breaks on a renamed key or a reordered array |
+
+The indexing above is declared here rather than inherited: RFC 5147 is cited for the *idea*
+of a line fragment, and koine counts from one because every face that shows a person a line
+number does.
+
+**Why closed, when chapter 8's extension rule is open.** A reader that ignored an address it
+did not understand would read *"supports page 14"* as *"supports the document"* — a widening
+wearing compatibility's clothes. Widening this vocabulary is a revision of this document,
+never a vendor profile. A parser MUST reject an unknown selector type.
+
+**Resolution has four answers, and the middle two are the point:** *resolved* (the version
+matches and the region was computed) · *stale* (the hash has moved — never silently
+downgraded into a best-effort region) · *opaque* (the version matches and the address is
+well-formed, but naming the region needs a format-aware reader — a page, a media offset) ·
+*not-found* (the version matches and the selector reaches nothing).
+
+An emitter MUST refuse a Locator whose `contentHash` does not match the body its endpoint
+names: a pointer that is broken at the moment it is written should not be discovered by
+whoever tries to follow it.
+
+### 3.5 Verification — four questions, four answers
+
+A verifier reports **four verdicts**, separately. Each is `pass`, `fail`, or
+**`not-established`** — *nothing here was checked*, which is a third fact and not a polite
+spelling of either other one.
+
+| verdict | the question |
+|---|---|
+| **integrity** | every `contentHash` recomputes, and the chain (§3.3) holds |
+| **schema** | every body that declares a shape block names a record type this tree carries, validates against it (§2.2), and its declared `state` agrees with the identity map's |
+| **references** | every edge, every commit `node` and every Locator names something that exists — and every Locator's `contentHash` matches the body it addresses |
+| **origin** | who vouches for this (chapter 6). `not-established` until a seal travels |
+
+One boolean over four unrelated questions cannot be acted on: a tree whose bytes are intact
+and whose bodies contradict their own record types is not the same artifact as one whose
+chain is broken, and a reader handed `false` for both has to re-derive which it holds. The
+same applies in the other direction and is why `not-established` exists — **an unasked
+question that reports `true` is indistinguishable, at every call site, from one that was
+asked and passed.**
+
+A `not-established` **origin does not make a tree invalid**: the seal is additive, never a
+gate (§6.2). A verifier's overall pass is *no verdict failed*.
+
 ## 4. Validity — the gradient and the travel law
 
 The states are `spoken → draft → valid → frozen`, declared in the shape block's `state`
-field. A floor-0 file without a shape block reads as `spoken` — an utterance, not yet a
-commitment. Four rules:
+field (§2.2). A floor-0 file without a shape block reads as `spoken` — an utterance, not yet
+a commitment.
+
+**Declaring travels; reading does not.** A body's declaration crosses the boundary in its
+identity-map row (§3.2), because a receiver cannot parse every format in the world to learn
+whether a body may be republished. **A state enforced only where the emitter stood is not a
+law — it is a call parameter**, and this specification carried exactly that defect through
+its first year: the gradient was stated here, applied at emit, and written into no field, so
+a tree could be parsed and re-emitted and arrive with its gradient gone.
+
+Five rules:
 
 1. **Promotion is the core gesture, and it is never silent.** Every state change is a
    semantic commit (§3.3): attributed, appended to history. A state that changed without a
@@ -259,6 +422,24 @@ commitment. Four rules:
    declares no state (`spoken`) is outside the gradient's gate: it travels as what it is —
    an utterance — and packaging does not promote it. The living clone carries every state;
    the gate refuses declared-but-unpromoted thinking, it does not require declaration.
+
+   **Absent and `spoken` are different facts, and the gate turns on the difference.** Stated
+   as the two tests an implementation runs, because one reading of the paragraph above cost
+   this standard a conformance defect: a row whose `state` **key is absent** travels; a row
+   declaring `"state":"spoken"` or `"state":"draft"` does not. Writing `state ?? "spoken"`
+   collapses the two, and a frozen slice of an undeclared tree then yields **zero bodies** —
+   a codec contradicting §7.6 of the document it implements, with a green test suite over it.
+
+5. **A frozen slice is a complete artifact over what survived, not a tree with its node list
+   shortened.** Whatever the gate withheld, the slice does not carry and does not NAME:
+
+   - history bound to an excluded body (`node`, §3.3) does not travel, and the surviving
+     commits are **renumbered from `seq: 1`** with a chain recomputed over them — so no gap
+     reports how much was withheld, and the chain that ships is verifiable rather than a
+     chain with holes in it;
+   - an emitter MUST refuse a slice in which any surviving sidecar — a commit's prose, a
+     dictionary document — still spells an excluded body's id. Filtering the node list while
+     the memory keeps talking about what it withheld is redaction that redacts nothing.
 
 ## 5. Proposals — the day-one gesture
 
@@ -692,6 +873,11 @@ obligations.
 
 - **The travel law gates the boundary** (chapter 4, rule 4): a body that declares a state
   below `valid` MUST NOT enter a package; an undeclared body travels as the utterance it is.
+  **An absent `state` and a declared `"spoken"` are different facts** — the first enters, the
+  second does not; chapter 4 rule 4 states both tests.
+- **A slice names nothing it withheld** (chapter 4, rule 5): history bound to an excluded
+  body does not travel, the surviving commits are renumbered with their chain recomputed, and
+  an emitter refuses a slice whose surviving sidecars still spell an excluded body's id.
 - **Law 4's exclusions are absolute** (§1.5): membership, permissions, presence, secrets,
   pending proposals and live threads never travel — a package carries no field for them.
 - **Law 3 holds at install** (§1.5): executable members travel inert — source and manifest,
@@ -1075,8 +1261,12 @@ contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and 
 
 ## Declared gaps
 
-1. **Edge grounding.** How a declared edge relates to (absent) textual anchors in the
-   bodies.
+1. **Edge grounding — CLOSED 2026-09-17.** *How a declared edge relates to (absent) textual
+   anchors in the bodies* is answered by the **Locator** (§3.4): an endpoint carries the
+   version it addressed and, optionally, one of six closed selector types. The number stays
+   so older references keep resolving. What remains open beside it, and is NOT this gap: how
+   a selector is expected to degrade for a format this document has not measured — a new
+   format's row in §3.4's table is written when a producer round-trips one.
 2. **Seal payload enumeration + conformance vectors.** Chapter 6's profile fixes the
    contract (DSSE PAE; method and key inside the payload; delegation certificate); the
    byte-exact payload field list and its fixtures are extracted from the reference
@@ -1102,6 +1292,45 @@ contradicts §7.5's carry-verbatim law, which is why ODRL is a mapping here and 
 ---
 
 ## Changelog
+
+### 2026-09-17 — the roundtrip, and the Locator
+
+**The form's own laws did not survive its own roundtrip, and an outside assessment found it
+before this project did.** Four defects with one cause — the boundary dropped what makes
+knowledge usable — plus the shape that made knowledge ABOUT something unable to travel at
+all. Each is now a field rather than a sentence:
+
+- **Validity travels.** `nodes.jsonl` gains **`state`** (§3.2). It was specified in chapter 4,
+  applied at emit, and written into no field: `parse → emit({frozenSlice})` yielded **zero
+  bodies**, and the reference implementation lived with `frozenSlice` switched off at both
+  ends because of it. A law enforced at a chokepoint the artifact cannot express is a call
+  parameter, and chapter 4 now says so in those words.
+- **The §7.6 contradiction is resolved, in favour of §7.6.** An absent `state` and a declared
+  `"spoken"` are different facts; `state ?? "spoken"` collapsed them and gated out the
+  undeclared bodies §7.6 says travel. Chapter 4 rule 4 states both tests explicitly.
+- **A frozen slice is a whole artifact** (chapter 4, rule 5). History bound to an excluded
+  body no longer travels, surviving commits renumber from `seq: 1` with the chain recomputed,
+  and an emitter refuses a slice whose surviving sidecars still spell an excluded id.
+- **History binds to the tree it remembers.** `commits.jsonl` gains **`node`** (§3.3), and
+  `what` is declared prose that a conformant reader never parses as an identifier. The
+  binding previously had nowhere to live but `what`, where no foreign reader can tell an id
+  from a sentence — which is also how it crossed the frozen-slice gate.
+- **Verification answers four questions** (new §3.5): integrity · schema · references ·
+  origin, each `pass` / `fail` / `not-established`. Two of the four had no implementation:
+  nothing ever opened a body against the dictionary the tree itself carries, and an unsealed
+  tree reported the same verdict a sealed one did. §2.2 declares the JSON Schema subset a
+  conformant validator asserts on, and the coercion rule without which no record type with a
+  non-string field was declarable in a shape block at all.
+- **The Locator** (new §3.4) — an edge endpoint may address a PART of a body and says which
+  version it addressed: a required `contentHash` plus one of six closed selector types, each
+  with prior art and a measured degradation. **Declared gap 1 (edge grounding) closes.**
+  Beside it, `edges.jsonl` gains the facets that make an assertion one — `actor`, `when`,
+  `validFrom`/`validTo` — and **`weight`**, the instance carrier for semantics the edge type
+  dictionary has declared since this document's first version and no travelling edge could
+  ever carry.
+
+**No byte changes to a tree that used none of this.** Every field above is omitted when
+absent (§1.4), so a tree written before this revision re-emits byte-for-byte unchanged.
 
 ### 2026-08-27 — the terms grammar freezes
 

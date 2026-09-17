@@ -67,14 +67,14 @@ describe('koine chain — conformance against the pilot', () => {
 
   it('verifyChain passes the pilot and convicts a rewritten why-field', async () => {
     const chain = emitChainJsonl(await computeChain(PILOT_COMMITS_JSONL))
-    expect(await verifyChain(PILOT_COMMITS_JSONL, chain)).toEqual({ ok: true, problems: [] })
+    expect(await verifyChain(PILOT_COMMITS_JSONL, chain)).toEqual({ status: 'pass', problems: [] })
 
     const tampered = PILOT_COMMITS_JSONL.replace(
       'the 2026-07-31 ratification recorded as data the room can answer from',
       'routine data import, nothing ratified',
     )
     const verdict = await verifyChain(tampered, chain)
-    expect(verdict.ok).toBe(false)
+    expect(verdict.status).toBe('fail')
     expect(verdict.problems.some((p) => p.includes('seq 2'))).toBe(true)
   })
 })

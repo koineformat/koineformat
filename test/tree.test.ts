@@ -85,12 +85,31 @@ describe('emitKoineTree / parseKoineTree', () => {
     expect(slice.has('notes/draft-idea.md')).toBe(false)
   })
 
-  it('treats a stateless node as spoken — it never enters a frozen slice', async () => {
+  it('lets an UNDECLARED body into a frozen slice — §7.6, and the one the codec used to contradict', async () => {
+    // "An undeclared body travels as the utterance it is" (§7.6), and §4 rule 4
+    // says the same at length: the gate refuses declared-but-unpromoted
+    // thinking, it does not REQUIRE declaration. The codec read
+    // `state ?? 'spoken'` and excluded it — two conformant readings of one
+    // form, which is the thing a specification exists to prevent.
     const slice = await emitKoineTree(
       { nodes: [{ id: 'c'.repeat(24), path: 'loose.md', format: 'markdown', bytes: 'x\n' }] },
       { frozenSlice: true },
     )
-    expect(parseKoineTree(slice).nodes).toEqual([])
+    expect(parseKoineTree(slice).nodes.map((n) => n.path)).toEqual(['loose.md'])
+    expect(parseKoineTree(slice).nodes[0]?.state).toBeUndefined()
+  })
+
+  it('keeps a DECLARED spoken body home — the distinction the old reading collapsed', async () => {
+    const slice = await emitKoineTree(
+      {
+        nodes: [
+          { id: 'c'.repeat(24), path: 'loose.md', format: 'markdown', bytes: 'x\n' },
+          { id: 'd'.repeat(24), path: 'said.md', format: 'markdown', bytes: 'y\n', state: 'spoken' },
+        ],
+      },
+      { frozenSlice: true },
+    )
+    expect(parseKoineTree(slice).nodes.map((n) => n.path)).toEqual(['loose.md'])
   })
 
   it('rejects reserved paths, duplicate ids, and dangling edges outside a slice', async () => {

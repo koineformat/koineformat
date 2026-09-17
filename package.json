@@ -1,7 +1,7 @@
 {
   "name": "koineformat",
-  "version": "0.1.2",
-  "description": "Definitions, types, decisions and their history as ordinary files beside your documents — so knowledge can leave home and still be understood, checked, and trusted.",
+  "version": "0.2.0",
+  "description": "Definitions, types, decisions and their history as ordinary files beside your documents \u2014 so knowledge can leave home and still be understood, checked, and trusted.",
   "homepage": "https://koineformat.org",
   "type": "module",
   "main": "dist/index.js",

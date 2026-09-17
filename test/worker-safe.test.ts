@@ -116,7 +116,10 @@ describe('worker-safe by construction', () => {
     expect(files.map((f) => relative(ROOT, f)).sort()).toEqual([
       'src/dictionaries.ts',
       'src/index.ts',
+      'src/locator.ts',
+      'src/schema.ts',
       'src/sha256.ts',
+      'src/shape.ts',
       'src/sidecars.ts',
       'src/tree.ts',
       'src/types.ts',

@@ -13,6 +13,8 @@
  */
 
 import { sha256Hex } from './sha256.js'
+import { canonicalLocator, parseLocator } from './locator.js'
+import { isValidity } from './shape.js'
 import {
   KoineParseError,
   type KoineChainHeader,
@@ -20,7 +22,8 @@ import {
   type KoineCommit,
   type KoineEdgeEntry,
   type KoineNodeEntry,
-  type KoineVerifyResult,
+  type KoineValidity,
+  type KoineVerdict,
 } from './types.js'
 
 export const CHAIN_FORMAT = 'koine/chain@v0'
@@ -66,13 +69,54 @@ function requireNumber(file: string, index: number, row: Record<string, unknown>
   return value
 }
 
+/** An optional string field: absent is legal, present-and-wrong is not. */
+function optionalString(
+  file: string,
+  index: number,
+  row: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = row[key]
+  if (value === undefined) return undefined
+  if (typeof value !== 'string' || value === '') {
+    throw new KoineParseError(file, index + 1, `field "${key}" is present and is not a non-empty string`)
+  }
+  return value
+}
+
+/** An optional finite number: absent is legal, present-and-wrong is not. */
+function optionalNumber(
+  file: string,
+  index: number,
+  row: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = row[key]
+  if (value === undefined) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new KoineParseError(file, index + 1, `field "${key}" is present and is not a number`)
+  }
+  return value
+}
+
 // ---------------------------------------------------------------------------
 // nodes.jsonl
 // ---------------------------------------------------------------------------
 
 export function emitNodesJsonl(entries: readonly KoineNodeEntry[]): string {
   return entries
-    .map((e) => jsonLine({ id: e.id, path: e.path, format: e.format, contentHash: e.contentHash }))
+    .map((e) =>
+      jsonLine({
+        id: e.id,
+        path: e.path,
+        format: e.format,
+        contentHash: e.contentHash,
+        // Omitted when the body declares no state — absent and `spoken` are
+        // different facts (SPEC §4 rule 4), and a tree written before the field
+        // existed must re-emit byte-identically.
+        ...(e.state !== undefined ? { state: e.state } : {}),
+      }),
+    )
     .map((l) => `${l}\n`)
     .join('')
 }
@@ -85,11 +129,16 @@ export function parseNodesJsonl(text: string): KoineNodeEntry[] {
     if (!/^sha256:[0-9a-f]{64}$/.test(contentHash)) {
       throw new KoineParseError(file, i + 1, 'contentHash must be "sha256:" + 64 lowercase hex chars')
     }
+    const state = optionalString(file, i, row, 'state')
+    if (state !== undefined && !isValidity(state)) {
+      throw new KoineParseError(file, i + 1, `"state": "${state}" is not on the validity gradient (SPEC §4)`)
+    }
     return {
       id: requireString(file, i, row, 'id'),
       path: requireString(file, i, row, 'path'),
       format: requireString(file, i, row, 'format'),
       contentHash: contentHash as KoineNodeEntry['contentHash'],
+      ...(state !== undefined ? { state: state as KoineValidity } : {}),
     }
   })
 }
@@ -100,7 +149,23 @@ export function parseNodesJsonl(text: string): KoineNodeEntry[] {
 
 export function emitEdgesJsonl(entries: readonly KoineEdgeEntry[]): string {
   return entries
-    .map((e) => jsonLine({ from: e.from, to: e.to, type: e.type }))
+    .map((e) =>
+      jsonLine({
+        from: e.from,
+        to: e.to,
+        type: e.type,
+        // Every facet below is omitted when absent: the three-key line an
+        // emitter wrote before §3.4 existed re-emits byte-identically, and a
+        // reader that understands none of them still reads a correct edge.
+        ...(e.fromLocator !== undefined ? { fromLocator: canonicalLocator(e.fromLocator) } : {}),
+        ...(e.toLocator !== undefined ? { toLocator: canonicalLocator(e.toLocator) } : {}),
+        ...(e.actor !== undefined ? { actor: e.actor } : {}),
+        ...(e.when !== undefined ? { when: e.when } : {}),
+        ...(e.validFrom !== undefined ? { validFrom: e.validFrom } : {}),
+        ...(e.validTo !== undefined ? { validTo: e.validTo } : {}),
+        ...(e.weight !== undefined ? { weight: e.weight } : {}),
+      }),
+    )
     .map((l) => `${l}\n`)
     .join('')
 }
@@ -109,13 +174,26 @@ export function parseEdgesJsonl(text: string): KoineEdgeEntry[] {
   const file = 'edges.jsonl'
   return splitLines(file, text).map((raw, i) => {
     const row = parseLine(file, i, raw)
+    const fromLocator = row['fromLocator']
+    const toLocator = row['toLocator']
     return {
       from: requireString(file, i, row, 'from'),
       to: requireString(file, i, row, 'to'),
       type: requireString(file, i, row, 'type'),
+      ...(fromLocator !== undefined ? { fromLocator: parseLocator(file, i + 1, fromLocator) } : {}),
+      ...(toLocator !== undefined ? { toLocator: parseLocator(file, i + 1, toLocator) } : {}),
+      ...optional('actor', optionalString(file, i, row, 'actor')),
+      ...optional('when', optionalString(file, i, row, 'when')),
+      ...optional('validFrom', optionalString(file, i, row, 'validFrom')),
+      ...optional('validTo', optionalString(file, i, row, 'validTo')),
+      ...optional('weight', optionalNumber(file, i, row, 'weight')),
     }
   })
 }
+
+/** `{key: value}` when the value is present, `{}` when it is not. */
+const optional = <T>(key: string, value: T | undefined): Record<string, T> =>
+  value === undefined ? {} : ({ [key]: value } as Record<string, T>)
 
 // ---------------------------------------------------------------------------
 // history/commits.jsonl
@@ -123,7 +201,19 @@ export function parseEdgesJsonl(text: string): KoineEdgeEntry[] {
 
 export function emitCommitsJsonl(commits: readonly KoineCommit[]): string {
   return commits
-    .map((c) => jsonLine({ seq: c.seq, actor: c.actor, what: c.what, why: c.why, when: c.when }))
+    .map((c) =>
+      jsonLine({
+        seq: c.seq,
+        actor: c.actor,
+        what: c.what,
+        why: c.why,
+        when: c.when,
+        // The declared binding to the identity map. Omitted for a commit about
+        // the tree rather than about one body — and omitted, therefore, by every
+        // history written before the field existed.
+        ...(c.node !== undefined ? { node: c.node } : {}),
+      }),
+    )
     .map((l) => `${l}\n`)
     .join('')
 }
@@ -138,6 +228,7 @@ export function parseCommitsJsonl(text: string): KoineCommit[] {
       what: requireString(file, i, row, 'what'),
       why: requireString(file, i, row, 'why'),
       when: requireString(file, i, row, 'when'),
+      ...optional('node', optionalString(file, i, row, 'node')),
     }
   })
 }
@@ -193,7 +284,7 @@ export function parseChainJsonl(text: string): { header: KoineChainHeader; links
  * `prev` continuity, everything after it). A consistently rewritten tail is
  * exposed by any second holder's copy — custody, not this function.
  */
-export async function verifyChain(commitsJsonl: string, chainJsonl: string): Promise<KoineVerifyResult> {
+export async function verifyChain(commitsJsonl: string, chainJsonl: string): Promise<KoineVerdict> {
   const problems: string[] = []
   const recorded = parseChainJsonl(chainJsonl)
   const recomputed = await computeChain(commitsJsonl)
@@ -208,5 +299,5 @@ export async function verifyChain(commitsJsonl: string, chainJsonl: string): Pro
       problems.push(`chain seq ${got.seq}: recomputed ${want.hash} != recorded ${got.hash}`)
     }
   }
-  return { ok: problems.length === 0, problems }
+  return { status: problems.length === 0 ? 'pass' : 'fail', problems }
 }
