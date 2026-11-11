@@ -900,7 +900,8 @@ the identity map (§3.1).
 {
   "koine": "0",                         // spec version this manifest targets (required)
   "name": "team-decisions",             // corpus identity (required)
-  "version": "2026.08.0",               // see §7.9 — versioning is OPEN (required)
+  "version": "sha256:<hex>",            // the same root as integrity (§7.9, required)
+  "versionName": "2026.08.0",            // optional human-readable name; not identity
   "description": "How our team makes and records architectural decisions.",
   "license": "CC-BY-4.0",               // terms: an SPDX license expression (§7.5)
   "readingFloor": 1,                    // which floor faithful consumption requires (§7.6)
@@ -948,8 +949,9 @@ consumer may not ignore, so §8.1 requires a validator to parse it (see below).
 
 - `name` — MUST match `^[a-z0-9][a-z0-9._-]*$`. Uniqueness is only meaningful **within a
   registry** (§7.8); a bare git source needs no global name.
-- `version` — REQUIRED, but its **semantics are OPEN** (§7.9). Treat it as an opaque,
-  orderable label for now.
+- `version` — REQUIRED. New emitters use the root hash in `integrity` (§7.9).
+  Readers also accept earlier opaque labels; hashes have no chronological ordering.
+- `versionName` — OPTIONAL human-readable name, often a date (§7.9); never identity.
 - `readingFloor` — OPTIONAL; `0`, `1` or `2`. **Which floor a package carries is
   self-evident from the tree** (the sidecars' presence); the one non-derivable fact is
   **which floor faithful consumption requires** — a package whose meaning leans on typed
@@ -1245,17 +1247,28 @@ host one, and a consumer MAY configure multiple. The wire protocol, name-collisi
 across registries, and trust model are **open**. Registry resolution is a trust boundary
 (§7.10).
 
-### 7.9 Versioning *(OPEN — the hard one)*
+### 7.9 Versioning — the root is the version
 
-Semver encodes *behavioral* compatibility, which does not map cleanly onto prose. What does a
-"breaking change" to a domain primer mean? Candidate models on the table:
+**A version is its root hash. A date is only its name.** A newly emitted package
+MUST set `version` to the `sha256:<hex>` root carried in `integrity` (§7.4).
+A publisher MAY attach a human-readable `versionName`, for example `2026.11.11`;
+that name neither identifies the version nor establishes an ordering between hashes.
+The corpus `name` (§7.3) continues to identify the package, not one of its versions.
+Because `koine.json` is outside the tree, writing the root into `version` introduces
+no circular hash. Renaming a date alone does not create a new version.
 
-- **CalVer** (`YYYY.MM.MICRO`) — fits "kept current by its source"; used in examples here as
-  a placeholder default, **not** a decision.
-- **Semver-of-meaning** — major = the claims changed, minor = additions, patch = wording.
-- **Content-addressed only** — no human version; the root hash *is* the version.
+**A new meaning is a new node.** A changed definition or act MUST receive a new node
+identity; it MUST NOT silently redefine an existing one. Corrections and revisions
+travel with their history and links to the earlier node (§3), so a reference to the
+old meaning continues to resolve to that meaning.
 
-No model is chosen. This is the single most important open question on the package side.
+**Every old version stays readable.** A new release MUST NOT rewrite an earlier
+version or make it unreadable. Readers MUST continue to accept packages whose
+`version` is an older opaque label, including CalVer labels and the old envelope
+dialects (§7.11). For those packages, integrity is checked by their original rules;
+a reader MUST NOT require retroactive hash-valued `version` fields. Publishers
+retain the bytes and identities of released versions. A newer version proposes
+new material; it does not erase what its predecessor said.
 
 ### 7.10 Security considerations
 
@@ -1714,14 +1727,22 @@ and for a year it did not.
 5. **The terms pricing grammar (§7.5) — CLOSED 2026-08-27.** The research pass ran (RSL 1.0
    read at source · ODRL 2.2 weighed and mapped in Annex A.4 · the x402 quote seam checked)
    and §7.5 froze the grammar. The number stays so older references keep resolving.
-6. **Package-side opens, carried from the envelope's own draft:** versioning semantics
-   (§7.9 — the hard one) · registry protocol and multi-registry trust (§7.8) ·
+6. **Package-side opens, carried from the envelope's own draft:** registry protocol
+   and multi-registry trust (§7.8) ·
    `representations` (§7.3) · tarball/sourceless distribution and archive signing (§7.8) ·
    whether a package may depend on another package, and how that resolves.
 
 ---
 
 ## Changelog
+
+### 2026-11-11 — version identity closes (§7.9)
+
+A version is its root hash; a date is only its optional `versionName`. A new
+meaning receives a new node, and every old version remains readable, including
+the opaque version labels emitted before this rule. The tree and hash algorithm
+are unchanged. This revision closes the versioning question without asking old
+packages to rewrite their manifests.
 
 ### 2026-09-17 (fifth round) — the account of a refusal, and what a query's population is
 
