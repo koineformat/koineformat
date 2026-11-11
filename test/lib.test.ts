@@ -150,6 +150,21 @@ describe("lib: seal → verify, entirely in memory (the koine form)", () => {
     expect(insp.lockMatches).toBeUndefined(); // nothing to compare against
   });
 
+  test("§7.9 — the root is the version; a renamed date keeps the root and old labels remain readable", async () => {
+    const files = draft({ "a.md": "A" });
+    const first = await sealPackage(files);
+    expect(first.manifest.version).toBe(first.manifest.integrity);
+    expect(first.manifest.versionName).toBeDefined();
+    files.set("koine.json", enc(serializeManifest({ ...first.manifest, versionName: "2026.11.11" })));
+    const renamed = await sealPackage(files);
+    expect(renamed.manifest.version).toBe(first.manifest.version);
+    expect(renamed.manifest.versionName).toBe("2026.11.11");
+    const old = { ...first.manifest, version: "2026.08.0" };
+    expect(parseManifest(serializeManifest(old)).version).toBe("2026.08.0");
+    files.set("koine.json", enc(serializeManifest(old)));
+    expect((await inspectFiles(files)).status).toBe("ok");
+  });
+
   test("sealing is deterministic — same bytes, same clock, same manifest and map (U2)", async () => {
     const now = new Date("2026-07-22T00:00:00.000Z");
     const filesOne = draft({ "a.md": "A" });

@@ -165,6 +165,7 @@ export async function sealPackage(
     pin: _pin,
     name,
     version,
+    versionName,
     description,
     license,
     readingFloor,
@@ -177,10 +178,13 @@ export async function sealPackage(
     contents: _contents,
     ...rest
   } = source;
+  const integrity = await rootHash(files);
+  const label = versionName ?? (version.startsWith("sha256:") ? undefined : version);
   const manifest: Manifest = {
     koine: SPEC_VERSION,
     name,
-    version,
+    version: integrity,
+    ...(label !== undefined ? { versionName: label } : {}),
     ...(description !== undefined ? { description } : {}),
     ...(license !== undefined ? { license } : {}),
     ...(readingFloor !== undefined ? { readingFloor } : {}),
@@ -194,7 +198,7 @@ export async function sealPackage(
       method: provenance?.method ?? "none",
       signature: provenance?.signature ?? null,
     },
-    integrity: await rootHash(files),
+    integrity,
     ...rest,
   };
 

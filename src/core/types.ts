@@ -55,8 +55,10 @@ export interface Manifest {
   pin?: string;
   /** Package identity; MUST match ^[a-z0-9][a-z0-9._-]*$ */
   name: string;
-  /** Opaque, orderable version label (semantics OPEN, SPEC §7.9). */
+  /** Root hash for new emissions; readers also accept legacy labels (SPEC §7.9). */
   version: string;
+  /** Optional human-readable name, such as a date; never version identity. */
+  versionName?: string;
   description?: string;
   license?: string;
   /** Which floor faithful consumption requires (SPEC §7.3); optional, unvalidated. */
