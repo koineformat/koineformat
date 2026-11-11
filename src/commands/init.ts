@@ -1,8 +1,8 @@
 /**
  * `koine init` — scaffold a koine.json in a knowledge folder so the format is
  * authorable. `integrity` is left empty; `koine seal` fills it (and builds the
- * identity map). Version defaults to CalVer (YYYY.MM.0), a placeholder —
- * SPEC §7.9 leaves versioning OPEN.
+ * identity map). The scaffold uses a CalVer (YYYY.MM.0) name; sealing moves
+ * it to versionName and sets version to the tree root (SPEC §7.9).
  */
 import { basename, join, relative, resolve } from "node:path";
 import type { Manifest } from "../core/types.js";

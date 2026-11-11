@@ -83,7 +83,7 @@ export function validateManifest(value: unknown): Manifest {
 
   const version = value["version"];
   if (typeof version !== "string" || version.length === 0) {
-    throw errBadManifest(`"version" is required (an opaque, orderable label)`);
+    throw errBadManifest(`"version" is required (a non-empty string; legacy labels remain readable)`);
   }
 
   // `requires` is the ONE accompanying field that is validated rather than
