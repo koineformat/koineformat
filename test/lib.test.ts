@@ -150,7 +150,7 @@ describe("lib: seal → verify, entirely in memory (the koine form)", () => {
     expect(insp.lockMatches).toBeUndefined(); // nothing to compare against
   });
 
-  test("the root is the version; a renamed date keeps the root and old labels remain readable", async () => {
+  test("§7.9 — the root is the version; a renamed date keeps the root and old labels remain readable", async () => {
     const files = draft({ "a.md": "A" });
     const first = await sealPackage(files);
     expect(first.manifest.version).toBe(first.manifest.integrity);
